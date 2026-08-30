@@ -47,6 +47,8 @@ iOS from evicting your data, and is a hard requirement for push notifications.
 Solo tracking needs none of this. The Squad tab tells you it is unconfigured and
 everything else keeps working.
 
+**See [SETUP.md](SETUP.md) for the click-by-click version.** The summary follows.
+
 ### 1. Create a free Supabase project
 
 At [supabase.com](https://supabase.com), new project, free tier. Note the region closest
