@@ -1,0 +1,90 @@
+import { useCallback, useEffect, useState } from 'react'
+import type { Session } from '@supabase/supabase-js'
+import { authRedirectUrl, supabase, type Profile } from '../lib/supabase'
+
+export type AuthPhase =
+  | 'unconfigured' // no Supabase project wired up
+  | 'loading'
+  | 'signed-out'
+  | 'needs-profile' // authenticated but has not claimed a handle
+  | 'ready'
+
+export interface AuthState {
+  phase: AuthPhase
+  session: Session | null
+  profile: Profile | null
+  refresh: () => Promise<void>
+}
+
+export function useAuth(): AuthState {
+  const [session, setSession] = useState<Session | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [phase, setPhase] = useState<AuthPhase>(supabase ? 'loading' : 'unconfigured')
+
+  const loadProfile = useCallback(async (userId: string) => {
+    if (!supabase) return
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+    setProfile(data ?? null)
+    setPhase(data ? 'ready' : 'needs-profile')
+  }, [])
+
+  const refresh = useCallback(async () => {
+    if (!supabase) return
+    const { data } = await supabase.auth.getSession()
+    setSession(data.session)
+    if (data.session?.user) await loadProfile(data.session.user.id)
+    else setPhase('signed-out')
+  }, [loadProfile])
+
+  useEffect(() => {
+    if (!supabase) return
+    void refresh()
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+      setSession(next)
+      if (next?.user) void loadProfile(next.user.id)
+      else {
+        setProfile(null)
+        setPhase('signed-out')
+      }
+    })
+    return () => sub.subscription.unsubscribe()
+  }, [refresh, loadProfile])
+
+  return { phase, session, profile, refresh }
+}
+
+export async function sendMagicLink(email: string): Promise<void> {
+  if (!supabase) throw new Error('Cloud not configured')
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: authRedirectUrl() },
+  })
+  if (error) throw error
+}
+
+export async function signOut(): Promise<void> {
+  await supabase?.auth.signOut()
+}
+
+export async function claimProfile(handle: string, displayName: string, emoji: string): Promise<void> {
+  if (!supabase) throw new Error('Cloud not configured')
+  const { data: auth } = await supabase.auth.getUser()
+  if (!auth.user) throw new Error('Not signed in')
+
+  const clean = handle.trim().toLowerCase()
+  if (!/^[a-z0-9_]{3,20}$/.test(clean)) {
+    throw new Error('Handles are 3–20 characters: letters, numbers and underscores.')
+  }
+
+  const { data: free } = await supabase.rpc('handle_available', { h: clean })
+  if (free === false) throw new Error('That handle is taken.')
+
+  const { error } = await supabase.from('profiles').insert({
+    id: auth.user.id,
+    handle: clean,
+    display_name: displayName.trim() || clean,
+    avatar_emoji: emoji,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  })
+  if (error) throw error
+}

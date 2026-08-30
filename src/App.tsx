@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { requestPersistence } from './db/schema'
+import { SyncIndicator, useSyncEngine } from './components/SyncIndicator'
 import { useArcData } from './state/useArc'
 import Onboarding from './screens/Onboarding'
 import Today from './screens/Today'
@@ -66,6 +67,7 @@ function ScrollReset() {
 
 export default function App() {
   const data = useArcData()
+  const sync = useSyncEngine()
 
   useEffect(() => {
     // Journals and photos live only here, so ask Safari not to evict us.
@@ -92,6 +94,7 @@ export default function App() {
   return (
     <div className="mx-auto max-w-lg">
       <ScrollReset />
+      <SyncIndicator pending={sync.pending} state={sync.state} />
       <Routes>
         <Route path="/" element={<Today data={data} />} />
         <Route path="/grid" element={<Grid data={data} />} />

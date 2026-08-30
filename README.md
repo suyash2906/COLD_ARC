@@ -39,6 +39,55 @@ Open that URL **in Safari** on your iPhone, then **Share → Add to Home Screen*
 Installing is not cosmetic. It is what makes the app open full-screen, run offline, keeps
 iOS from evicting your data, and is a hard requirement for push notifications.
 
+
+---
+
+## Turning on the squad features
+
+Solo tracking needs none of this. The Squad tab tells you it is unconfigured and
+everything else keeps working.
+
+### 1. Create a free Supabase project
+
+At [supabase.com](https://supabase.com), new project, free tier. Note the region closest
+to you.
+
+### 2. Run the migration
+
+Open **SQL Editor** in the Supabase dashboard, paste the whole of
+`supabase/migrations/0001_init.sql`, and run it. That creates the tables, the row-level
+security policies, and the RPCs for joining squads and settling duels.
+
+### 3. Wire up the keys
+
+**Project Settings → API** gives you the project URL and the `anon` public key.
+
+Locally, put them in `.env.local`:
+
+```
+VITE_SUPABASE_URL=https://xxxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+```
+
+For the deployed app, add the same two as repo secrets under **Settings → Secrets and
+variables → Actions**. The deploy workflow injects them at build time.
+
+The anon key ends up in the built JavaScript. That is normal and safe — it identifies the
+project, it does not grant access. Row-level security is what actually protects the data,
+which is why every table has it enabled and no policy exposes another user's rows unless
+you share a squad or a duel with them.
+
+### 4. Allow the redirect
+
+**Authentication → URL Configuration**: add `https://<you>.github.io/cold-arc/**` to the
+redirect allow-list, otherwise the magic link will bounce.
+
+### Anti-pause
+
+Free Supabase projects are paused after 7 days of inactivity. `.github/workflows/keepalive.yml`
+pings the REST API weekly to prevent that. It no-ops harmlessly if you never configure
+Supabase.
+
 ---
 
 ## Local development
