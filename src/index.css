@@ -1,0 +1,123 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-ink: #08090b;
+  --color-surface: #101216;
+  --color-surface-2: #171a20;
+  --color-line: #23272f;
+  --color-line-soft: #191d24;
+  --color-fg: #e9edf3;
+  --color-muted: #828b99;
+  --color-faint: #565e6b;
+
+  --color-ice-50: #ecfaff;
+  --color-ice-200: #b8e7ff;
+  --color-ice-300: #7dd3fc;
+  --color-ice-400: #38bdf8;
+  --color-ice-500: #0ea5e9;
+  --color-ice-600: #0284c7;
+
+  --color-ember: #fb923c;
+  --color-fail: #f2545b;
+  --color-gold: #fbbf24;
+
+  --font-sans: 'Inter var', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    background: var(--color-ink);
+    color-scheme: dark;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-ink);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    /* Kill the rubber-band scroll so the standalone app does not feel like a web page. */
+    overscroll-behavior-y: none;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Tap highlights and long-press callouts are the two things that most give a PWA away. */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  [role='button'] {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+
+  /* Numerals should never reflow as counters tick. */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
+  input,
+  textarea,
+  select {
+    /* iOS zooms the viewport for any font under 16px in a focused field. */
+    font-size: max(16px, 1em);
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+}
+
+@utility safe-t {
+  padding-top: env(safe-area-inset-top);
+}
+@utility safe-b {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@layer components {
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line-soft);
+    border-radius: 1rem;
+  }
+
+  .press {
+    transition:
+      transform 140ms var(--ease-out-quint),
+      background-color 140ms var(--ease-out-quint),
+      border-color 140ms var(--ease-out-quint);
+  }
+  .press:active {
+    transform: scale(0.975);
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 320ms var(--ease-out-quint) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .press {
+    animation: none;
+    transition: none;
+  }
+}
