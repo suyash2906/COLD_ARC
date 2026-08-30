@@ -71,12 +71,22 @@ export async function sendMagicLink(email: string): Promise<void> {
  */
 export async function verifyEmailCode(email: string, token: string): Promise<void> {
   if (!supabase) throw new Error('Cloud not configured')
-  const { error } = await supabase.auth.verifyOtp({
-    email: email.trim(),
-    token: token.trim(),
-    type: 'email',
-  })
-  if (error) throw error
+  const clean = { email: email.trim(), token: token.trim() }
+
+  // A first-ever sign-in is a signup confirmation; a returning user gets a magic-link
+  // OTP. The generic 'email' type covers both on most versions, but fall back rather
+  // than tell someone their correct code is wrong.
+  const attempts = ['email', 'signup', 'magiclink'] as const
+  let lastError: Error | null = null
+
+  for (const type of attempts) {
+    const { error } = await supabase.auth.verifyOtp({ ...clean, type })
+    if (!error) return
+    lastError = error
+    // A wrong or expired code is final — only retry when the *type* was the problem.
+    if (/expired|invalid/i.test(error.message) && !/type/i.test(error.message)) break
+  }
+  throw lastError ?? new Error('Could not verify that code.')
 }
 
 export async function signOut(): Promise<void> {
