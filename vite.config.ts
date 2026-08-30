@@ -7,13 +7,19 @@ import { defineConfig } from 'vite'
 // Override with VITE_BASE if you rename the repo or move to a custom domain.
 const BASE = process.env.VITE_BASE ?? '/cold-arc/'
 
-export default defineConfig(({ command }) => ({
-  base: command === 'serve' ? '/' : BASE,
+export default defineConfig(({ command, isPreview }) => ({
+  // `vite preview` also runs as the "serve" command, but it serves the built output and
+  // should mirror production exactly — otherwise every asset 404s into the SPA fallback.
+  base: command === 'serve' && !isPreview ? '/' : BASE,
   plugins: [
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // .webmanifest is missing from some static servers' MIME tables (vite preview
+      // included), which makes them fall through to the SPA handler and return HTML.
+      // .json is understood everywhere.
+      manifestFilename: 'manifest.json',
       includeAssets: ['icon-180.png', 'favicon.svg'],
       manifest: {
         name: 'Cold Arc',
