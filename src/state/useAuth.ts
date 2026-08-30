@@ -62,6 +62,23 @@ export async function sendMagicLink(email: string): Promise<void> {
   if (error) throw error
 }
 
+/**
+ * An installed PWA has its own storage, separate from Safari. A magic link tapped in
+ * Mail opens in Safari, so the session lands in the wrong box and the PWA never sees
+ * it — and PKCE fails outright, since the code verifier lives in the PWA's storage.
+ *
+ * Typing the emailed code keeps the whole exchange inside the app, where it belongs.
+ */
+export async function verifyEmailCode(email: string, token: string): Promise<void> {
+  if (!supabase) throw new Error('Cloud not configured')
+  const { error } = await supabase.auth.verifyOtp({
+    email: email.trim(),
+    token: token.trim(),
+    type: 'email',
+  })
+  if (error) throw error
+}
+
 export async function signOut(): Promise<void> {
   await supabase?.auth.signOut()
 }

@@ -3,7 +3,7 @@ import { Button, EmptyState, Screen, ScreenTitle, scoreColor } from '../componen
 import { formatShort } from '../lib/dates'
 import { syncEntireArc } from '../lib/sync'
 import type { Duel } from '../lib/supabase'
-import { claimProfile, sendMagicLink, signOut, useAuth } from '../state/useAuth'
+import { claimProfile, sendMagicLink, signOut, useAuth, verifyEmailCode } from '../state/useAuth'
 import {
   challenge,
   createSquad,
@@ -112,18 +112,32 @@ function Unconfigured() {
 
 function SignIn() {
   const [email, setEmail] = useState('')
+  const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function submit() {
+  async function send() {
     setBusy(true)
     setError(null)
     try {
       await sendMagicLink(email.trim())
       setSent(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not send the link.')
+      setError(e instanceof Error ? e.message : 'Could not send the code.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function verify() {
+    setBusy(true)
+    setError(null)
+    try {
+      // No redirect involved, so the session lands in this app's own storage.
+      await verifyEmailCode(email, code)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'That code did not work.')
     } finally {
       setBusy(false)
     }
@@ -133,16 +147,38 @@ function SignIn() {
     <Screen>
       <ScreenTitle title="Squad" sub="Compete with people running their own arc" />
       {sent ? (
-        <div className="card px-5 py-6 text-center">
-          <div className="mb-3 text-3xl">📬</div>
-          <p className="text-[15px] font-medium">Check {email}</p>
-          <p className="text-muted mt-2 text-[13px] leading-relaxed">
-            Tap the link on this phone and you will land back here signed in.
-          </p>
-          <button onClick={() => setSent(false)} className="text-ice-400 mt-4 text-[13px]">
+        <>
+          <div className="card mb-4 px-4 py-4 text-center">
+            <div className="mb-2 text-2xl">📬</div>
+            <p className="text-[14.5px] font-medium">Check {email}</p>
+            <p className="text-muted mt-1.5 text-[13px] leading-relaxed">
+              Enter the 6-digit code from the email.
+            </p>
+          </div>
+
+          <input
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="000000"
+            className="bg-surface-2 border-line text-fg placeholder:text-faint tnum mb-3 w-full rounded-xl border px-4 py-4 text-center text-[26px] tracking-[0.4em] outline-none"
+          />
+          <Button onClick={verify} disabled={busy || code.length < 6}>
+            {busy ? 'Checking…' : 'Sign in'}
+          </Button>
+
+          <button
+            onClick={() => {
+              setSent(false)
+              setCode('')
+              setError(null)
+            }}
+            className="text-faint mt-4 w-full text-center text-[12.5px]"
+          >
             Use a different email
           </button>
-        </div>
+        </>
       ) : (
         <>
           <div className="card mb-4 px-4 py-4">
@@ -160,13 +196,13 @@ function SignIn() {
             placeholder="you@example.com"
             className="bg-surface-2 border-line text-fg placeholder:text-faint mb-2.5 w-full rounded-xl border px-4 py-3.5 outline-none"
           />
-          <Button onClick={submit} disabled={busy || !email.includes('@')}>
-            {busy ? 'Sending…' : 'Email me a link'}
+          <Button onClick={send} disabled={busy || !email.includes('@')}>
+            {busy ? 'Sending…' : 'Email me a code'}
           </Button>
           <p className="text-faint mt-3 text-center text-[12px]">No password to create or remember.</p>
-          {error && <p className="text-fail mt-3 text-center text-[13px]">{error}</p>}
         </>
       )}
+      {error && <p className="text-fail mt-3 text-center text-[13px]">{error}</p>}
     </Screen>
   )
 }
