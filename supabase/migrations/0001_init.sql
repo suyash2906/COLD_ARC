@@ -381,13 +381,6 @@ grant select, insert, update, delete on
   public.duels
 to authenticated;
 
-grant execute on function
-  public.create_squad(text),
-  public.join_squad(text),
-  public.handle_available(text),
-  public.settle_due_duels(),
-  public.is_squad_member(uuid),
-  public.shares_squad_with(uuid),
-  public.is_dueling_with(uuid),
-  public.can_see(uuid)
-to authenticated;
+-- Naming each function individually made this sensitive to statement order.
+-- Granting across the schema cannot reference something that does not exist yet.
+grant execute on all functions in schema public to authenticated;
