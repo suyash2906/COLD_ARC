@@ -230,6 +230,38 @@ create policy duels_update on public.duels
   for update using (challenger_id = auth.uid() or opponent_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
+-- Grants
+--
+-- Supabase can be told not to auto-expose new tables. Granting explicitly means
+-- this migration works either way instead of depending on a dashboard toggle.
+--
+-- Every policy above requires auth.uid(), so `anon` is deliberately given nothing
+-- beyond schema usage: signed-out visitors can reach the API and see zero rows.
+-- ---------------------------------------------------------------------------
+
+grant usage on schema public to anon, authenticated;
+
+grant select, insert, update, delete on
+  public.profiles,
+  public.arcs_public,
+  public.daily_scores,
+  public.squads,
+  public.squad_members,
+  public.duels
+to authenticated;
+
+grant execute on function
+  public.create_squad(text),
+  public.join_squad(text),
+  public.handle_available(text),
+  public.settle_due_duels(),
+  public.is_squad_member(uuid),
+  public.shares_squad_with(uuid),
+  public.is_dueling_with(uuid),
+  public.can_see(uuid)
+to authenticated;
+
+-- ---------------------------------------------------------------------------
 -- RPCs
 -- ---------------------------------------------------------------------------
 
