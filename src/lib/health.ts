@@ -38,8 +38,10 @@ export function parseHealth(text: string): HealthDays | null {
   const workoutMinutes = new Map<ISODate, number>()
   for (const line of lines.slice(1)) {
     const [kind, date, raw] = line.split(/\s+/)
-    const n = amount(raw ?? '')
-    if (!DATE.test(date ?? '') || !Number.isFinite(n) || n < 0) continue
+    // "Time between dates" in Shortcuts can come out negative depending on which date is
+    // first; a workout's length is its length either way.
+    const n = Math.abs(amount(raw ?? ''))
+    if (!DATE.test(date ?? '') || !Number.isFinite(n)) continue
     const into = kind?.toUpperCase() === 'S' ? steps : kind?.toUpperCase() === 'W' ? workoutMinutes : null
     into?.set(date, (into.get(date) ?? 0) + n)
   }

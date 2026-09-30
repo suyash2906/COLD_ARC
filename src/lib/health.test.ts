@@ -11,6 +11,10 @@ describe('parseHealth', () => {
     expect(parsed?.workoutMinutes.get('2026-10-01')).toBe(46)
   })
 
+  it('reads a workout length the same whichever way round the dates were', () => {
+    expect(parseHealth('COLDARC\nW 2026-10-01 -34')?.workoutMinutes.get('2026-10-01')).toBe(34)
+  })
+
   it('rejects clipboard text that did not come from the shortcut', () => {
     expect(parseHealth('hello')).toBeNull()
     expect(parseHealth('')).toBeNull()
