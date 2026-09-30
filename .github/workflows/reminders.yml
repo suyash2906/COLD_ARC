@@ -4,8 +4,8 @@ name: Reminders
 # what is still undone, so no task data goes through here. Times are IST (UTC+5:30),
 # written in UTC below, and must match REMINDER_TIMES in src/lib/push.ts.
 #
-# GitHub may start scheduled runs a few minutes late, and pauses schedules on a repo with
-# no activity for 60 days (one click on the Actions tab turns it back on).
+# GitHub may start scheduled runs a few minutes late. It also pauses schedules on a repo
+# with no activity for 60 days, which the last step below prevents.
 on:
   schedule:
     - cron: '30 13 * * *' # 7:00 pm
@@ -17,6 +17,8 @@ on:
 jobs:
   push:
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Send the reminder
         env:
@@ -39,3 +41,12 @@ jobs:
             --vapid-subject="https://suyash2906.github.io/COLD_ARC/" \
             --vapid-pubkey="$VAPID_PUBLIC_KEY" \
             --vapid-pvtkey="$VAPID_PRIVATE_KEY"
+
+      # Re-enabling the workflow through the API resets GitHub's 60-day inactivity timer,
+      # so reminders keep running even if nothing is pushed to the repo for months.
+      - name: Keep the schedule alive
+        if: github.event_name == 'schedule'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/reminders.yml/enable"
