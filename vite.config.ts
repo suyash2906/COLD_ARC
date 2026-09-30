@@ -16,6 +16,8 @@ export default defineConfig(({ command, isPreview }) => ({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registered from main.tsx instead, so it can re-check for updates on resume.
+      injectRegister: false,
       // .webmanifest is missing from some static servers' MIME tables (vite preview
       // included), which makes them fall through to the SPA handler and return HTML.
       // .json is understood everywhere.

@@ -3,8 +3,8 @@ import { logId } from '../db/schema'
 import type { Arc, Commitment, Strictness } from './types'
 
 /**
- * The single source of truth for "how did today go". Today ring, grid, stats,
- * leaderboard and duel resolution all read from here — never re-derive it elsewhere.
+ * The single source of truth for "how did today go". Today, the grid and stats all
+ * read from here — never re-derive it elsewhere.
  */
 
 export interface ScoringInput {
@@ -154,7 +154,7 @@ export interface StreakInfo {
   perfectDays: number
   /** Days elapsed in the arc, capped at its length. */
   elapsed: number
-  /** Mean score over elapsed days — the fair all-time leaderboard metric. */
+  /** Mean score over elapsed days. */
   averageScore: number
 }
 
@@ -218,7 +218,7 @@ export function computeStreaks(input: ScoringInput, today: ISODate, scores?: Day
 export interface WeekSummary {
   weekKey: string
   weekStart: ISODate
-  /** Sum of day scores, 0..700. The weekly leaderboard metric. */
+  /** Sum of day scores, 0..700. */
   total: number
   average: number
   perfectDays: number

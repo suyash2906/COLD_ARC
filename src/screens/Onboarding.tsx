@@ -288,7 +288,7 @@ export default function Onboarding() {
               {busy ? 'Signing…' : 'Sign and start'}
             </Button>
           </div>
-          <p className="text-faint mt-3 text-center text-[12.5px]">Everything stays on this device until you join a squad.</p>
+          <p className="text-faint mt-3 text-center text-[12.5px]">Everything stays on this device. No account, no server.</p>
         </div>
       )}
     </div>

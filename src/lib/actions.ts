@@ -1,5 +1,5 @@
 import { dayId, db, logId } from '../db/schema'
-import { todayISO, type ISODate } from './dates'
+import type { ISODate } from './dates'
 import { daysToEnd } from './presets'
 import type { CommitmentTemplate } from './presets'
 import type { Arc, Commitment, Strictness } from './types'
@@ -34,21 +34,18 @@ export async function createArc(spec: NewArcSpec): Promise<Arc> {
     status: 'active',
   }
 
-  await db.transaction('rw', db.arcs, db.commitments, db.syncQueue, async () => {
+  await db.transaction('rw', db.arcs, db.commitments, async () => {
     await db.arcs.where('status').equals('active').modify({ status: 'abandoned' })
     await db.arcs.add(arc)
     await db.commitments.bulkAdd(
       spec.commitments.map((c, i) => ({ ...c, id: uid(), arcId: arc.id, order: i, archivedAt: null })),
     )
   })
-  await queueArcPublic(arc)
   return arc
 }
 
 export async function updateArc(arcId: string, patch: Partial<Arc>): Promise<void> {
   await db.arcs.update(arcId, patch)
-  const arc = await db.arcs.get(arcId)
-  if (arc) await queueArcPublic(arc)
 }
 
 export async function endArc(arcId: string, status: 'completed' | 'abandoned' = 'completed'): Promise<void> {
@@ -63,13 +60,10 @@ export function arcEnd(arc: Pick<Arc, 'startDate' | 'totalDays'>): ISODate {
 export async function addCommitment(arcId: string, tpl: CommitmentTemplate): Promise<void> {
   const count = await db.commitments.where('arcId').equals(arcId).count()
   await db.commitments.add({ ...tpl, id: uid(), arcId, order: count, archivedAt: null })
-  await queueScoreForDate(arcId, todayISO())
 }
 
 export async function updateCommitment(id: string, patch: Partial<Commitment>): Promise<void> {
   await db.commitments.update(id, patch)
-  const c = await db.commitments.get(id)
-  if (c) await queueScoreForDate(c.arcId, todayISO())
 }
 
 /**
@@ -79,12 +73,6 @@ export async function updateCommitment(id: string, patch: Partial<Commitment>): 
  */
 export async function archiveCommitment(id: string): Promise<void> {
   await db.commitments.update(id, { archivedAt: Date.now() })
-  const c = await db.commitments.get(id)
-  const arc = c && (await db.arcs.get(c.arcId))
-  if (!c || !arc) return
-  // Squadmates see the commitment names, and today's score just changed shape.
-  await queueArcPublic(arc)
-  await queueScoreForDate(arc.id, todayISO())
 }
 
 export async function reorderCommitments(ids: string[]): Promise<void> {
@@ -112,7 +100,6 @@ export async function setLogValue(
       loggedAt: Date.now(),
     })
   }
-  await queueScoreForDate(arc.id, date)
 }
 
 export async function toggleCommitment(arc: Arc, commitment: Commitment, date: ISODate, on: boolean): Promise<void> {
@@ -138,7 +125,6 @@ export async function setDayMeta(
   })
 }
 
-/** Device-only: journals never reach the sync queue. */
 export async function saveJournal(arcId: string, date: ISODate, body: string): Promise<void> {
   const id = `${arcId}:${date}`
   if (!body.trim()) {
@@ -148,36 +134,12 @@ export async function saveJournal(arcId: string, date: ISODate, body: string): P
   await db.journals.put({ id, arcId, date, body, updatedAt: Date.now() })
 }
 
-/** Device-only: photo blobs never reach the sync queue. */
 export async function savePhoto(arcId: string, date: ISODate, blob: Blob, width: number, height: number): Promise<void> {
   await db.photos.put({ id: `${arcId}:${date}`, arcId, date, blob, width, height, createdAt: Date.now() })
 }
 
 export async function deletePhoto(id: string): Promise<void> {
   await db.photos.delete(id)
-}
-
-/**
- * Sync queue. Entries are deduped per (kind, key) so hammering a counter all evening
- * produces one pending row, not fifty.
- */
-async function enqueue(kind: 'daily_score' | 'arc_public', dedupeKey: string, payload: unknown): Promise<void> {
-  await db.transaction('rw', db.syncQueue, async () => {
-    const existing = await db.syncQueue.where('dedupeKey').equals(dedupeKey).first()
-    if (existing?.id !== undefined) {
-      await db.syncQueue.update(existing.id, { payload, attempts: 0, lastError: null, createdAt: Date.now() })
-      return
-    }
-    await db.syncQueue.add({ kind, dedupeKey, payload, attempts: 0, lastError: null, createdAt: Date.now() })
-  })
-}
-
-async function queueScoreForDate(arcId: string, date: ISODate): Promise<void> {
-  await enqueue('daily_score', `daily_score:${arcId}:${date}`, { arcId, date })
-}
-
-async function queueArcPublic(arc: Arc): Promise<void> {
-  await enqueue('arc_public', `arc_public:${arc.id}`, { arcId: arc.id })
 }
 
 /**

@@ -11,12 +11,10 @@ Open the link in **Safari**, then Share -> **Add to Home Screen**.
 It opens full-screen like a normal app, works with no signal, and keeps your data on the
 device.
 
-## Squads
+## Private by design
 
-Leaderboards, duels and streak alerts need a free Supabase project. See **[SETUP.md](SETUP.md)**.
-
-Your daily score, streak and commitment names are shared with your squad. Your journal,
-photos and exact numbers never leave the phone.
+No account, no server. Everything stays on the phone. Use **More → Export everything** to
+back it up.
 
 ## Development
 

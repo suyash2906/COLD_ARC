@@ -1,15 +1,12 @@
 import { useEffect } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { requestPersistence } from './db/schema'
-import { SyncIndicator } from './components/SyncIndicator'
 import { Spinner } from './components/ui'
 import { useArcData } from './state/useArc'
-import { useSyncEngine } from './state/useSyncEngine'
 import Onboarding from './screens/Onboarding'
 import Today from './screens/Today'
 import Grid from './screens/Grid'
 import Stats from './screens/Stats'
-import Squad from './screens/Squad'
 import Settings from './screens/Settings'
 import Contract from './screens/Contract'
 
@@ -17,7 +14,6 @@ const TABS = [
   { to: '/', label: 'Today', icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18M8.4 12.2l2.6 2.6 4.6-5.2' },
   { to: '/grid', label: 'Grid', icon: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z' },
   { to: '/stats', label: 'Stats', icon: 'M4 20V10M10 20V4M16 20v-7M22 20H2' },
-  { to: '/squad', label: 'Squad', icon: 'M16 20v-1a4 4 0 0 0-8 0v1M12 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6M21 20v-1a3 3 0 0 0-2-2.8' },
   { to: '/settings', label: 'More', icon: 'M4 6h16M4 12h16M4 18h16' },
 ]
 
@@ -75,7 +71,6 @@ function ScrollReset() {
 
 export default function App() {
   const data = useArcData()
-  const sync = useSyncEngine()
 
   useEffect(() => {
     // Journals and photos live only here, so ask Safari not to evict us.
@@ -102,12 +97,10 @@ export default function App() {
   return (
     <div className="mx-auto max-w-lg">
       <ScrollReset />
-      <SyncIndicator pending={sync.pending} state={sync.state} />
       <Routes>
         <Route path="/" element={<Today data={data} />} />
         <Route path="/grid" element={<Grid data={data} />} />
         <Route path="/stats" element={<Stats data={data} />} />
-        <Route path="/squad" element={<Squad data={data} />} />
         <Route path="/settings" element={<Settings data={data} />} />
         <Route path="/contract" element={<Contract data={data} />} />
         <Route path="/onboarding" element={<Onboarding />} />

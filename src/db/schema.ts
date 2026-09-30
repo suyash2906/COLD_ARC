@@ -1,11 +1,10 @@
 import Dexie, { type Table } from 'dexie'
 import type {
-  Arc, Commitment, DayRecord, JournalEntry, LogEntry, Photo, Settings, SyncItem,
+  Arc, Commitment, DayRecord, JournalEntry, LogEntry, Photo, Settings,
 } from '../lib/types'
 
 /**
- * Local-first store. This is the source of truth — the cloud only ever holds a
- * derived projection of it, so the app stays fully usable offline and signed out.
+ * The only store. Everything lives on this device; nothing is uploaded anywhere.
  */
 class ColdArcDB extends Dexie {
   arcs!: Table<Arc, string>
@@ -14,7 +13,6 @@ class ColdArcDB extends Dexie {
   days!: Table<DayRecord, string>
   journals!: Table<JournalEntry, string>
   photos!: Table<Photo, string>
-  syncQueue!: Table<SyncItem, number>
   settings!: Table<Settings, string>
 
   constructor() {
@@ -29,6 +27,8 @@ class ColdArcDB extends Dexie {
       syncQueue: '++id, kind, dedupeKey, createdAt',
       settings: 'key',
     })
+    // The squad upload queue is gone; drop its table and any rows still waiting in it.
+    this.version(2).stores({ syncQueue: null })
   }
 }
 

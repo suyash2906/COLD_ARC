@@ -71,7 +71,6 @@ export interface DayRecord {
   graceUsed: boolean
 }
 
-/** Device-only. Never enters the sync queue. */
 export interface JournalEntry {
   id: string
   arcId: string
@@ -80,7 +79,7 @@ export interface JournalEntry {
   updatedAt: number
 }
 
-/** Device-only. Blobs live in IndexedDB and are excluded from sync by design. */
+/** Blobs live in IndexedDB alongside everything else. */
 export interface Photo {
   id: string
   arcId: string
@@ -88,19 +87,6 @@ export interface Photo {
   blob: Blob
   width: number
   height: number
-  createdAt: number
-}
-
-export type SyncKind = 'daily_score' | 'arc_public' | 'streak_event'
-
-export interface SyncItem {
-  id?: number
-  kind: SyncKind
-  /** Dedupe key so repeated edits to the same day collapse into one pending row. */
-  dedupeKey: string
-  payload: unknown
-  attempts: number
-  lastError: string | null
   createdAt: number
 }
 

@@ -155,7 +155,7 @@ export default function Settings({ data }: { data: ArcData }) {
       <p className="text-faint mt-8 text-center text-[12px] leading-relaxed">
         Cold Arc · everything local by default
         <br />
-        No account needed until you join a squad.
+        No account, no server, nothing uploaded.
       </p>
     </Screen>
   )
