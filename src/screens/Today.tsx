@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CommitmentRow } from '../components/CommitmentRow'
-import { ParticleField, type FieldDay } from '../components/ParticleField'
+import { ParticleField } from '../components/ParticleField'
 import { EmptyState, Flame, IconChip, Label, List, Orb, Row, Screen } from '../components/ui'
 import { addDays, arcDay, arcEndDate, daysBetween, formatLong, type ISODate } from '../lib/dates'
 import { saveJournal, setDayMeta } from '../lib/actions'
@@ -10,6 +10,20 @@ import type { Arc, Commitment } from '../lib/types'
 import { useDayRecord, useJournal, type ArcData } from '../state/useArc'
 
 const MOODS = ['😵', '😕', '😐', '🙂', '🔥']
+
+/** After this hour, a day that is still mostly undone turns the particles red. */
+const EVENING_HOUR = 18
+const LOW_SCORE = 40
+
+/** True from 6pm local time, re-checked every minute so the warning switches on by itself. */
+function useIsEvening(): boolean {
+  const [evening, setEvening] = useState(() => new Date().getHours() >= EVENING_HOUR)
+  useEffect(() => {
+    const id = window.setInterval(() => setEvening(new Date().getHours() >= EVENING_HOUR), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+  return evening
+}
 
 function Chevron({ dir }: { dir: 'left' | 'right' }) {
   return (
@@ -26,7 +40,7 @@ const EditLink = () => (
 )
 
 export default function Today({ data }: { data: ArcData }) {
-  const { arc, input, today, allScores } = data
+  const { arc, input, today } = data
   // The arc may be over, so "today" is clamped to its last day.
   const lastDay: ISODate = arc ? minDate(today, arcEndDate(arc.startDate, arc.totalDays)) : today
   // Lets you fill in yesterday without leaving the screen you actually use.
@@ -36,19 +50,10 @@ export default function Today({ data }: { data: ArcData }) {
   const dayRecord = useDayRecord(arc?.id, date)
   const [journalDraft, setJournalDraft] = useState<string | null>(null)
 
-  const field = useMemo<FieldDay[]>(
-    () =>
-      allScores.map((d) => ({
-        score: d.score,
-        touched: d.touched,
-        future: d.date > today,
-        today: d.date === today,
-      })),
-    [allScores, today],
-  )
+  const evening = useIsEvening()
 
   if (!arc || !input) return null
-  if (today < arc.startDate) return <NotStarted arc={arc} today={today} commitments={data.commitments} field={field} />
+  if (today < arc.startDate) return <NotStarted arc={arc} today={today} commitments={data.commitments} />
 
   const day = scoreDay(input, date)
   const dayNum = arcDay(arc.startDate, date)
@@ -56,6 +61,8 @@ export default function Today({ data }: { data: ArcData }) {
   const canGoBack = date > arc.startDate
   const canGoForward = date < lastDay
   const body = journalDraft ?? journal?.body ?? ''
+  // A past day is over, so a low score there is already a miss; today gets until 6pm.
+  const behind = day.total > 0 && day.score < LOW_SCORE && (date < today || evening)
 
   return (
     <Screen>
@@ -67,7 +74,7 @@ export default function Today({ data }: { data: ArcData }) {
       </header>
       <h1 className="display rise mt-2 text-[40px]">{isToday ? 'Today' : formatLong(date)}</h1>
 
-      <ParticleField days={field} className="-mx-5 h-[300px]">
+      <ParticleField progress={day.score} warn={behind} className="-mx-5 h-[300px]">
         <div className="flex h-full items-center justify-between px-6">
           <div className="w-[84px]">
             <div className="display tnum text-[clamp(36px,11vw,46px)]">{day.score}</div>
@@ -167,12 +174,10 @@ function NotStarted({
   arc,
   today,
   commitments,
-  field,
 }: {
   arc: Arc
   today: ISODate
   commitments: Commitment[]
-  field: FieldDay[]
 }) {
   const wait = daysBetween(today, arc.startDate)
   const active = commitments.filter((c) => !c.archivedAt)
@@ -184,7 +189,7 @@ function NotStarted({
         Starts in {wait} {wait === 1 ? 'day' : 'days'}
       </h1>
 
-      <ParticleField days={field} className="-mx-5 h-[280px]">
+      <ParticleField progress={0} className="-mx-5 h-[280px]">
         <div className="grid h-full place-items-center">
           <Orb value={0} size={104} />
         </div>

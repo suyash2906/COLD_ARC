@@ -102,7 +102,7 @@ export default function Onboarding() {
     <div className="mx-auto min-h-dvh max-w-lg px-5 pt-[max(1.75rem,calc(env(safe-area-inset-top)+0.75rem))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       {step === 0 && (
         <div>
-          <ParticleField className="-mx-5 h-[min(380px,48dvh)]">
+          <ParticleField progress={65} className="-mx-5 h-[min(380px,48dvh)]">
             <div className="flex h-full items-center justify-between px-6">
               <span className="display text-[clamp(34px,11vw,48px)]">Cold</span>
               <Orb value={100} size={96} />
