@@ -1,4 +1,4 @@
-import { addDays, arcDay, clamp, daysBetween, isoWeekKey, startOfWeek, weekdayIndex, type ISODate } from './dates'
+import { addDays, arcDay, clamp, daysBetween, isoWeekKey, startOfWeek, toISODate, weekdayIndex, type ISODate } from './dates'
 import { logId } from '../db/schema'
 import type { Arc, Commitment, Strictness } from './types'
 
@@ -164,12 +164,17 @@ export interface StreakInfo {
  *
  * Today never breaks a streak. A tracker that zeroes you out at 9am because you have not
  * been to the gym yet would be actively wrong.
+ *
+ * A backdated arc starts with a run of blank days from before the contract was signed.
+ * Those still break the streak, but they do not spend grace — otherwise every token is
+ * gone before day one, and the "saved" days show up as a streak nobody earned.
  */
 export function computeStreaks(input: ScoringInput, today: ISODate, scores?: DayScore[]): StreakInfo {
   const { arc } = input
   const threshold = streakThreshold(arc.strictness)
   const dates = arcDates(arc)
   const all = scores ?? scoreRange(input, dates)
+  const signedOn = arc.signedAt ? toISODate(new Date(arc.signedAt)) : null
 
   const elapsedCount = clamp(arcDay(arc.startDate, today), 0, arc.totalDays)
 
@@ -189,6 +194,8 @@ export function computeStreaks(input: ScoringInput, today: ISODate, scores?: Day
       current++
     } else if (isToday) {
       break // still in play; leave the streak standing
+    } else if (signedOn && day.date < signedOn && !day.touched) {
+      current = 0
     } else if (grace > 0) {
       grace--
       current++

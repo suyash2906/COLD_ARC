@@ -245,6 +245,24 @@ describe('streaks', () => {
     expect(s.current).toBe(7)
     expect(s.averageScore).toBe(70)
   })
+
+  it('does not spend grace on blank days from before the contract was signed', () => {
+    const today = addDays(MONDAY, 9)
+    const signedAt = new Date(2026, 9, 14).getTime() // signed on the last of the ten days
+    const backdated = input(cs, daily(10, [0, 1, 2, 3, 4, 5, 6]), arc({ graceTokens: 3, signedAt }))
+    const s = computeStreaks(backdated, today)
+    expect(s.graceRemaining).toBe(3)
+    expect(s.current).toBe(3)
+    expect(s.longest).toBe(3)
+  })
+
+  it('still spends grace on a real miss after signing', () => {
+    const today = addDays(MONDAY, 9)
+    const signedAt = new Date(2026, 9, 5).getTime() // signed on day one
+    const s = computeStreaks(input(cs, daily(10, [4]), arc({ graceTokens: 1, signedAt })), today)
+    expect(s.graceRemaining).toBe(0)
+    expect(s.current).toBe(10)
+  })
 })
 
 describe('cross-window fairness', () => {

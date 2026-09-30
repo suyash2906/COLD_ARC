@@ -66,7 +66,6 @@ export async function syncNow(): Promise<SyncState> {
 
         const all = scoreRange(input, arcDates(input.arc))
         const byDate = new Map(all.map((d) => [d.date, d]))
-        const streaks = computeStreaks(input, today, all)
 
         const scoreDates = new Set(
           items
@@ -84,8 +83,9 @@ export async function syncNow(): Promise<SyncState> {
             completed: day.completed,
             total: day.total,
             perfect: day.perfect,
-            // Only the newest day carries a meaningful streak reading.
-            streak_at: date === today ? streaks.current : 0,
+            // The streak as it stood on that day, so the leaderboard can read the newest
+            // row it has even before someone logs anything today.
+            streak_at: computeStreaks(input, date, all).current,
           })
         }
 

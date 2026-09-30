@@ -73,9 +73,14 @@ export function useSquad(enabled: boolean): SquadView {
         return
       }
 
-      const [{ data: arcData }, scores, { data: duelData }] = await Promise.all([
+      const yesterday = addDays(today, -1)
+      // On a Monday, yesterday belongs to last week — fetch it anyway so the streak and the
+      // missed-yesterday callout still have something to read.
+      const from = yesterday < weekStart ? yesterday : weekStart
+
+      const [{ data: arcData }, fetched, { data: duelData }] = await Promise.all([
         supabase.from('arcs_public').select('*').in('user_id', ids),
-        fetchScores(ids, weekStart, today),
+        fetchScores(ids, from, today),
         supabase
           .from('duels')
           .select('*')
@@ -85,16 +90,16 @@ export function useSquad(enabled: boolean): SquadView {
       ])
 
       const arcs = new Map((arcData ?? []).map((a: ArcPublic) => [a.user_id, a]))
-      const yesterday = addDays(today, -1)
 
       const built: LeaderRow[] = members.map((m) => {
         // PostgREST returns the embedded row as an object or a single-element array
         // depending on how it infers the relationship.
         const p = (Array.isArray(m.profiles) ? m.profiles[0] : m.profiles) ?? null
-        const mine = scores.filter((s) => s.user_id === m.user_id)
+        const all = fetched.filter((s) => s.user_id === m.user_id)
+        const mine = all.filter((s) => s.date >= weekStart)
         const weekTotal = mine.reduce((n, s) => n + s.score, 0)
         const arc = arcs.get(m.user_id) ?? null
-        const latest = mine.reduce<(typeof mine)[number] | null>(
+        const latest = all.reduce<(typeof all)[number] | null>(
           (best, s) => (!best || s.date > best.date ? s : best),
           null,
         )
@@ -107,7 +112,7 @@ export function useSquad(enabled: boolean): SquadView {
           weekTotal,
           weekAverage: mine.length ? Math.round(weekTotal / mine.length) : 0,
           perfectDays: mine.filter((s) => s.perfect).length,
-          streak: latest?.date === today ? latest.streak_at : (latest?.streak_at ?? 0),
+          streak: latest?.streak_at ?? 0,
           arcName: arc?.name ?? null,
           arcDay: arc ? arcDay(arc.start_date, today) : null,
           arcTotalDays: arc?.total_days ?? null,
@@ -115,8 +120,8 @@ export function useSquad(enabled: boolean): SquadView {
           missedYesterday:
             !!arc &&
             arc.start_date <= yesterday &&
-            !mine.some((s) => s.date === yesterday && s.score > 0),
-          loggedToday: mine.some((s) => s.date === today),
+            !all.some((s) => s.date === yesterday && s.score > 0),
+          loggedToday: all.some((s) => s.date === today),
         }
       })
 
@@ -218,11 +223,9 @@ export async function challenge(
   if (error) throw error
 }
 
+/** Goes through an RPC so only the opponent can answer, and nobody can write a winner. */
 export async function respondToDuel(duelId: string, accept: boolean): Promise<void> {
   if (!supabase) throw new Error('Cloud not configured')
-  const { error } = await supabase
-    .from('duels')
-    .update({ status: accept ? 'active' : 'declined' })
-    .eq('id', duelId)
+  const { error } = await supabase.rpc('respond_to_duel', { duel_id: duelId, accept })
   if (error) throw error
 }

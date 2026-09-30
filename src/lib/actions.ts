@@ -79,6 +79,12 @@ export async function updateCommitment(id: string, patch: Partial<Commitment>): 
  */
 export async function archiveCommitment(id: string): Promise<void> {
   await db.commitments.update(id, { archivedAt: Date.now() })
+  const c = await db.commitments.get(id)
+  const arc = c && (await db.arcs.get(c.arcId))
+  if (!c || !arc) return
+  // Squadmates see the commitment names, and today's score just changed shape.
+  await queueArcPublic(arc)
+  await queueScoreForDate(arc.id, todayISO())
 }
 
 export async function reorderCommitments(ids: string[]): Promise<void> {
