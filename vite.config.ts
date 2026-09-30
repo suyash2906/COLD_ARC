@@ -45,6 +45,10 @@ export default defineConfig(({ command, isPreview }) => ({
         // Hash routing means every route resolves to index.html.
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
+        // Take over as soon as a new version downloads. Otherwise it waits for every copy
+        // of the app to close, which on an iPhone can mean never.
+        skipWaiting: true,
+        clientsClaim: true,
       },
       devOptions: { enabled: false },
     }),
