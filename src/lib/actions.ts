@@ -57,6 +57,11 @@ export function arcEnd(arc: Pick<Arc, 'startDate' | 'totalDays'>): ISODate {
   return daysToEnd(arc.startDate, arc.totalDays)
 }
 
+/** The terms can be edited until day one. From then on, the contract is the contract. */
+export function contractLocked(arc: Pick<Arc, 'startDate'>, today: ISODate): boolean {
+  return today >= arc.startDate
+}
+
 export async function addCommitment(arcId: string, tpl: CommitmentTemplate): Promise<void> {
   const count = await db.commitments.where('arcId').equals(arcId).count()
   await db.commitments.add({ ...tpl, id: uid(), arcId, order: count, archivedAt: null })
@@ -122,6 +127,23 @@ export async function setDayMeta(
     graceUsed: false,
     ...existing,
     ...patch,
+  })
+}
+
+export async function markPenaltyDone(arcId: string, date: ISODate, commitmentId: string): Promise<void> {
+  const id = dayId(arcId, date)
+  const existing = await db.days.get(id)
+  const done = new Set(existing?.penaltiesDone ?? [])
+  done.add(commitmentId)
+  await db.days.put({
+    id,
+    arcId,
+    date,
+    mood: null,
+    winOfTheDay: null,
+    graceUsed: false,
+    ...existing,
+    penaltiesDone: [...done],
   })
 }
 

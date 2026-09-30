@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button, Label, List, Row, Screen, ScreenTitle } from '../components/ui'
-import { arcEnd, endArc, exportArc, importArc } from '../lib/actions'
+import { arcEnd, contractLocked, endArc, exportArc, importArc } from '../lib/actions'
 import { requestPersistence } from '../db/schema'
 import { formatShort } from '../lib/dates'
 import type { ArcData } from '../state/useArc'
@@ -86,7 +86,9 @@ export default function Settings({ data }: { data: ArcData }) {
             </Row>
           ))}
           <Row onClick={() => nav('/contract')}>
-            <span className="flex-1 text-[14.5px] font-medium">Edit contract</span>
+            <span className="flex-1 text-[14.5px] font-medium">
+              {contractLocked(arc, data.today) ? 'View contract' : 'Edit contract'}
+            </span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-faint" aria-hidden>
               <path d="m9 18 6-6-6-6" />
             </svg>

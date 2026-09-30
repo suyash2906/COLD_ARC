@@ -17,11 +17,11 @@ const TABS = [
   { to: '/settings', label: 'More', icon: 'M4 6h16M4 12h16M4 18h16' },
 ]
 
-/** Floats above the content as a pill, the way the nav does on a launch page. */
+/** A floating pane of frosted glass: content stays visible through it, just blurred. */
 function TabBar() {
   return (
     <nav className="fixed inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-4">
-      <div className="flex w-full max-w-[26rem] rounded-full border border-white/[0.08] bg-[#0f0f12]/80 p-1.5 shadow-[0_12px_40px_rgb(0_0_0/0.7)] backdrop-blur-xl">
+      <div className="flex w-full max-w-[26rem] rounded-full border border-white/[0.14] bg-white/[0.06] p-1.5 shadow-[inset_0_1px_0_rgb(255_255_255/0.16),inset_0_-1px_0_rgb(255_255_255/0.04),0_12px_40px_rgb(0_0_0/0.45)] backdrop-blur-2xl backdrop-saturate-150">
         {TABS.map((t) => (
           <NavLink
             key={t.to}
@@ -29,7 +29,7 @@ function TabBar() {
             end={t.to === '/'}
             className={({ isActive }) =>
               `press flex flex-1 flex-col items-center gap-0.5 rounded-full py-2 ${
-                isActive ? 'text-fg bg-white/[0.1]' : 'text-white/40'
+                isActive ? 'text-fg bg-white/[0.14]' : 'text-white/55'
               }`
             }
           >

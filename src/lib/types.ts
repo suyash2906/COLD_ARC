@@ -47,6 +47,8 @@ export interface Commitment {
   timesPerWeek: number
   /** Relative contribution to the day score. Defaults to 1. */
   weight: number
+  /** A must: missing it on a day it was due costs push-ups or squats. */
+  important?: boolean
   order: number
   archivedAt: number | null
 }
@@ -69,6 +71,8 @@ export interface DayRecord {
   mood: number | null
   winOfTheDay: string | null
   graceUsed: boolean
+  /** Commitments whose penalty for this day has been paid off. */
+  penaltiesDone?: string[]
 }
 
 export interface JournalEntry {

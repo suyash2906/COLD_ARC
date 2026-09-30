@@ -14,7 +14,7 @@ import {
   type StreakInfo,
   type WeekSummary,
 } from '../lib/scoring'
-import type { Arc, Commitment, LogEntry, Photo } from '../lib/types'
+import type { Arc, Commitment, DayRecord, LogEntry, Photo } from '../lib/types'
 
 export interface ArcData {
   loading: boolean
@@ -110,6 +110,15 @@ export function useDayRecord(arcId: string | undefined, date: string) {
     async () => (arcId ? await db.days.get(`${arcId}:${date}`) : undefined),
     [arcId, date],
     undefined,
+  )
+}
+
+/** Every day record of the arc, which is where paid penalties are kept. */
+export function useDayRecords(arcId: string | undefined) {
+  return useLiveQuery(
+    async () => (arcId ? await db.days.where('arcId').equals(arcId).toArray() : ([] as DayRecord[])),
+    [arcId],
+    [] as DayRecord[],
   )
 }
 

@@ -27,6 +27,9 @@ function t(over: Partial<CommitmentTemplate> & Pick<CommitmentTemplate, 'label' 
   }
 }
 
+/** 8000 -> "8,000", 3.8 -> "3.8". */
+export const formatAmount = (n: number) => Number(n.toFixed(2)).toLocaleString('en-US')
+
 /** `time` targets are minutes past midnight, so 05:30 is 330. */
 export const minutesToClock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m) % 60).padStart(2, '0')}`
 export const clockToMinutes = (s: string) => {
@@ -35,6 +38,29 @@ export const clockToMinutes = (s: string) => {
 }
 
 export const CONTRACT_PRESETS: ContractPreset[] = [
+  {
+    // Built for an 8-to-3 college day: rules that fit before 8 and after 3, aimed at
+    // losing fat and catching up on studies, with one run a week.
+    id: 'cut-and-study',
+    name: 'Cut & Study',
+    tagline: 'Ten daily rules around an 8–3 college day. Lose fat, fix your grades, run once a week.',
+    strictness: 'forgiving',
+    graceTokens: 3,
+    fixedDays: null,
+    commitments: [
+      t({ label: 'Wake up', icon: '🌅', kind: 'time', target: 360, direction: 'at_most', weight: 2, important: true }),
+      t({ label: 'Water', icon: '💧', kind: 'count', target: 3, unit: 'L' }),
+      t({ label: 'Steps', icon: '👟', kind: 'count', target: 8000, unit: 'steps' }),
+      t({ label: "Revise today's lectures", icon: '📝', kind: 'duration', target: 15, unit: 'min' }),
+      t({ label: 'Workout', icon: '💪', kind: 'duration', target: 20, unit: 'min', weight: 2, important: true }),
+      t({ label: 'Deep study, phone away', icon: '📚', kind: 'duration', target: 60, unit: 'min', weight: 2, important: true }),
+      t({ label: 'No junk or sugary drinks', icon: '🥗', weight: 2, important: true }),
+      t({ label: 'Kitchen closed after 9 pm', icon: '🍽️' }),
+      t({ label: 'Social media', icon: '📵', kind: 'duration', target: 60, direction: 'at_most', unit: 'min' }),
+      t({ label: 'In bed', icon: '🛏️', kind: 'time', target: 1380, direction: 'at_most' }),
+      t({ label: 'Run', icon: '🏃', cadence: 'n_per_week', timesPerWeek: 1, weight: 2, important: true }),
+    ],
+  },
   {
     id: 'winter-arc',
     name: 'Winter Arc',

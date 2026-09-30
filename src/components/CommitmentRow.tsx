@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { setLogValue, toggleCommitment } from '../lib/actions'
-import { clockToMinutes, minutesToClock } from '../lib/presets'
+import { clockToMinutes, formatAmount, minutesToClock } from '../lib/presets'
 import type { CommitmentResult } from '../lib/scoring'
 import type { Arc } from '../lib/types'
 import { IconChip } from './ui'
@@ -35,8 +35,29 @@ function Check({ on, dim }: { on: boolean; dim?: boolean }) {
   )
 }
 
+/** "miss = 10 push-ups", shown on musts so the cost is in view while you still can avoid it. */
+function Cost({ penalty, lead = true }: { penalty?: string; lead?: boolean }) {
+  if (!penalty) return null
+  return (
+    <span className="text-ember/85">
+      {lead && ' · '}miss = {penalty}
+    </span>
+  )
+}
+
 /** One commitment as a row inside the day's list. Rows carry no box of their own. */
-export function CommitmentRow({ arc, result, date }: { arc: Arc; result: CommitmentResult; date: string }) {
+export function CommitmentRow({
+  arc,
+  result,
+  date,
+  penalty,
+}: {
+  arc: Arc
+  result: CommitmentResult
+  date: string
+  /** What missing this costs, for musts that are due. */
+  penalty?: string
+}) {
   const { commitment: c, satisfied, value, scheduled, fraction } = result
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -51,12 +72,14 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
   // An n_per_week commitment that isn't required today is shown, but muted — you can
   // still log it, it just isn't held against you.
   const optional = !scheduled
+  // Only warn while it can still be saved.
+  const cost = satisfied || optional ? undefined : penalty
 
   const hint = (() => {
     if (c.kind === 'bool') return optional ? 'Optional today' : c.cadence === 'n_per_week' ? `${c.timesPerWeek}× a week` : ''
     if (c.kind === 'time') return `${c.direction === 'at_most' ? 'by' : 'after'} ${minutesToClock(c.target)}`
     const dir = c.direction === 'at_most' ? 'under ' : ''
-    return `${dir}${trim(c.target)} ${c.unit}`
+    return `${dir}${formatAmount(c.target)} ${c.unit}`
   })()
 
   if (c.kind === 'bool') {
@@ -68,7 +91,12 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
         <IconChip icon={c.icon} dim={optional && !satisfied} />
         <div className="min-w-0 flex-1">
           <div className={`truncate text-[15.5px] font-medium ${optional && !satisfied ? 'text-muted' : ''}`}>{c.label}</div>
-          {hint && <div className="text-faint text-[12.5px]">{hint}</div>}
+          {(hint || cost) && (
+            <div className="text-faint text-[12.5px]">
+              {hint}
+              <Cost penalty={cost} lead={Boolean(hint)} />
+            </div>
+          )}
         </div>
         <Check on={satisfied} dim={optional} />
       </button>
@@ -81,7 +109,10 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
         <IconChip icon={c.icon} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15.5px] font-medium">{c.label}</div>
-          <div className="text-faint text-[12.5px]">{hint}</div>
+          <div className="text-faint text-[12.5px]">
+            {hint}
+            <Cost penalty={cost} />
+          </div>
         </div>
         <input
           type="time"
@@ -138,10 +169,11 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
               className="tnum text-faint text-[12.5px]"
             >
               <span className={satisfied ? 'text-ice-300' : value !== null ? 'text-muted' : ''}>
-                {value === null ? '—' : trim(value)}
+                {value === null ? '—' : formatAmount(value)}
               </span>
               {' / '}
               {hint}
+              <Cost penalty={cost} />
             </button>
           )}
         </div>

@@ -9,6 +9,7 @@ import {
   WINDOW_PRESETS,
   daysToEnd,
   endToDays,
+  formatAmount,
   minutesToClock,
   resolveWindow,
   type ContractPreset,
@@ -18,8 +19,17 @@ import type { CommitmentTemplate } from '../lib/presets'
 function describeTarget(c: CommitmentTemplate): string {
   const cadence = c.cadence === 'n_per_week' ? `${c.timesPerWeek}× a week` : ''
   if (c.kind === 'bool') return cadence || 'Every day'
-  const base = c.kind === 'time' ? `by ${minutesToClock(c.target)}` : `${c.direction === 'at_most' ? 'under ' : ''}${c.target} ${c.unit}`
+  const base = c.kind === 'time' ? `by ${minutesToClock(c.target)}` : `${c.direction === 'at_most' ? 'under ' : ''}${formatAmount(c.target)} ${c.unit}`
   return cadence ? `${base} · ${cadence}` : base
+}
+
+/** "75 days", "10 daily · 1 weekly", "5 habits" or "Empty". */
+function presetMeta(p: ContractPreset): string {
+  if (p.fixedDays) return `${p.fixedDays} days`
+  if (p.commitments.length === 0) return 'Empty'
+  const weekly = p.commitments.filter((c) => c.cadence === 'n_per_week').length
+  const daily = p.commitments.length - weekly
+  return weekly && daily ? `${daily} daily · ${weekly} weekly` : `${p.commitments.length} habits`
 }
 
 function Radio({ on }: { on: boolean }) {
@@ -130,7 +140,7 @@ export default function Onboarding() {
                     <div className="flex items-baseline justify-between gap-3">
                       <span className="text-[16px] font-medium">{p.name}</span>
                       <span className="text-faint shrink-0 text-[12px]">
-                        {p.fixedDays ? `${p.fixedDays} days` : p.commitments.length ? `${p.commitments.length} habits` : 'Empty'}
+                        {presetMeta(p)}
                       </span>
                     </div>
                     <p className="text-muted mt-1 text-[13.5px] leading-snug">{p.tagline}</p>
@@ -254,6 +264,11 @@ export default function Onboarding() {
                     <div className="truncate text-[15.5px] font-medium">{c.label}</div>
                     <div className="text-muted text-[12.5px]">{describeTarget(c)}</div>
                   </div>
+                  {c.important && (
+                    <span className="bg-ember/10 text-ember shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium">
+                      Must
+                    </span>
+                  )}
                   <button
                     onClick={() => setCommitments(commitments.filter((_, j) => j !== i))}
                     className="press text-faint active:text-fail grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/[0.05] text-[17px] leading-none"
@@ -274,6 +289,7 @@ export default function Onboarding() {
                 ['Length', `${totalDays} days`],
                 ['Streak rule', preset.strictness === 'strict' ? 'Perfect days only' : '80% or better'],
                 ['Grace tokens', String(preset.graceTokens)],
+                ...(commitments.some((c) => c.important) ? [['Missed musts', '10 push-ups or squats, +5 a month']] : []),
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between px-1 py-3">
                   <dt className="text-muted">{k}</dt>

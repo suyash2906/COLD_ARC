@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackButton, Button, IconChip, Label, List, Row, Screen, ScreenTitle, Segmented, Sheet } from '../components/ui'
-import { formatShort, toISODate } from '../lib/dates'
-import { addCommitment, archiveCommitment, arcEnd, updateArc, updateCommitment } from '../lib/actions'
-import { COMMITMENT_LIBRARY, clockToMinutes, endToDays, minutesToClock } from '../lib/presets'
+import { formatLong, formatShort, toISODate } from '../lib/dates'
+import { addCommitment, archiveCommitment, arcEnd, contractLocked, updateArc, updateCommitment } from '../lib/actions'
+import { COMMITMENT_LIBRARY, clockToMinutes, endToDays, formatAmount, minutesToClock } from '../lib/presets'
 import type { CommitmentTemplate } from '../lib/presets'
 import type { ArcData } from '../state/useArc'
 import type { Commitment } from '../lib/types'
@@ -11,7 +11,7 @@ import type { Commitment } from '../lib/types'
 function targetLabel(c: Commitment | CommitmentTemplate): string {
   if (c.kind === 'bool') return c.cadence === 'n_per_week' ? `${c.timesPerWeek}× a week` : 'Daily'
   if (c.kind === 'time') return `${c.direction === 'at_most' ? 'by' : 'after'} ${minutesToClock(c.target)}`
-  return `${c.direction === 'at_most' ? 'under ' : ''}${c.target} ${c.unit}`
+  return `${c.direction === 'at_most' ? 'under ' : ''}${formatAmount(c.target)} ${c.unit}`
 }
 
 const Chevron = () => (
@@ -20,15 +20,20 @@ const Chevron = () => (
   </svg>
 )
 
+const MustBadge = () => (
+  <span className="bg-ember/10 text-ember shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium">Must</span>
+)
+
 export default function Contract({ data }: { data: ArcData }) {
   const nav = useNavigate()
-  const { arc, commitments } = data
+  const { arc, commitments, today } = data
   const [adding, setAdding] = useState(false)
   const [editing, setEditing] = useState<Commitment | null>(null)
 
   if (!arc) return null
   const active = commitments.filter((c) => !c.archivedAt)
   const endDate = arcEnd(arc)
+  const locked = contractLocked(arc, today)
 
   // Opened directly (a reload, or a shared link) there is no history to go back to.
   const back = () => ((window.history.state?.idx ?? 0) > 0 ? nav(-1) : nav('/'))
@@ -41,74 +46,112 @@ export default function Contract({ data }: { data: ArcData }) {
         title="The contract"
       />
 
-      <section className="rise">
+      <div
+        className={`rise mb-9 rounded-[18px] px-4 py-3 text-[13.5px] leading-snug ${
+          locked ? 'bg-white/[0.05] text-muted' : 'bg-ice-400/[0.08] text-ice-200'
+        }`}
+      >
+        {locked
+          ? `🔒 Locked since ${formatShort(arc.startDate)}. The terms are the terms.`
+          : `Editable until ${formatLong(arc.startDate)}, when it locks for the rest of the arc.`}
+      </div>
+
+      <section>
         <Label>Window</Label>
-        <List>
-          <div className="flex items-center gap-3 px-4 py-3.5">
-            <label className="min-w-0 flex-1">
-              <span className="text-faint text-[12px]">From</span>
-              <input
-                type="date"
-                value={arc.startDate}
-                onChange={(e) =>
-                  e.target.value &&
-                  void updateArc(arc.id, {
-                    startDate: e.target.value,
-                    totalDays: endToDays(e.target.value, endDate),
-                  })
-                }
-                className="text-fg w-full min-w-0 bg-transparent text-[15px] outline-none"
-              />
-            </label>
-            <label className="min-w-0 flex-1">
-              <span className="text-faint text-[12px]">Until</span>
-              <input
-                type="date"
-                value={endDate}
-                min={arc.startDate}
-                onChange={(e) =>
-                  e.target.value && void updateArc(arc.id, { totalDays: endToDays(arc.startDate, e.target.value) })
-                }
-                className="text-fg w-full min-w-0 bg-transparent text-[15px] outline-none"
-              />
-            </label>
-          </div>
-        </List>
-        <p className="text-faint mt-2.5 px-1 text-[12.5px]">
-          {arc.totalDays} days. Extending the end date is normal — plenty of arcs run into February.
-        </p>
+        {locked ? (
+          <List>
+            <Row>
+              <span className="text-muted flex-1 text-[14.5px]">
+                {formatShort(arc.startDate)} → {formatShort(endDate)}
+              </span>
+              <span className="tnum text-[14.5px]">{arc.totalDays} days</span>
+            </Row>
+          </List>
+        ) : (
+          <>
+            <List>
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <label className="min-w-0 flex-1">
+                  <span className="text-faint text-[12px]">From</span>
+                  <input
+                    type="date"
+                    value={arc.startDate}
+                    onChange={(e) =>
+                      e.target.value &&
+                      void updateArc(arc.id, {
+                        startDate: e.target.value,
+                        totalDays: endToDays(e.target.value, endDate),
+                      })
+                    }
+                    className="text-fg w-full min-w-0 bg-transparent text-[15px] outline-none"
+                  />
+                </label>
+                <label className="min-w-0 flex-1">
+                  <span className="text-faint text-[12px]">Until</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={arc.startDate}
+                    onChange={(e) =>
+                      e.target.value && void updateArc(arc.id, { totalDays: endToDays(arc.startDate, e.target.value) })
+                    }
+                    className="text-fg w-full min-w-0 bg-transparent text-[15px] outline-none"
+                  />
+                </label>
+              </div>
+            </List>
+            <p className="text-faint mt-2.5 px-1 text-[12.5px]">{arc.totalDays} days.</p>
+          </>
+        )}
       </section>
 
       <section className="mt-9">
         <Label>Rules</Label>
-        <Segmented
-          value={arc.strictness}
-          onChange={(s) => void updateArc(arc.id, { strictness: s })}
-          options={[
-            { value: 'strict', label: 'Perfect only' },
-            { value: 'forgiving', label: '80% counts' },
-          ]}
-        />
-        <div className="mt-4 flex items-center justify-between px-1">
-          <span className="text-[15px]">Grace tokens</span>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => void updateArc(arc.id, { graceTokens: Math.max(0, arc.graceTokens - 1) })}
-              className="press grid h-9 w-9 place-items-center rounded-full bg-white/[0.07] text-[18px]"
-              aria-label="Fewer grace tokens"
-            >
-              −
-            </button>
-            <span className="tnum w-5 text-center text-[17px] font-medium">{arc.graceTokens}</span>
-            <button
-              onClick={() => void updateArc(arc.id, { graceTokens: Math.min(14, arc.graceTokens + 1) })}
-              className="press grid h-9 w-9 place-items-center rounded-full bg-white/[0.07] text-[18px]"
-              aria-label="More grace tokens"
-            >
-              +
-            </button>
-          </div>
-        </div>
+        {locked ? (
+          <List>
+            {[
+              ['Streak rule', arc.strictness === 'strict' ? 'Perfect days only' : '80% or better'],
+              ['Grace tokens', String(arc.graceTokens)],
+              ['Missed musts', '10 push-ups or squats, +5 a month'],
+            ].map(([k, v]) => (
+              <Row key={k}>
+                <span className="text-muted flex-1 text-[14.5px]">{k}</span>
+                <span className="text-[14.5px]">{v}</span>
+              </Row>
+            ))}
+          </List>
+        ) : (
+          <>
+            <Segmented
+              value={arc.strictness}
+              onChange={(s) => void updateArc(arc.id, { strictness: s })}
+              options={[
+                { value: 'strict', label: 'Perfect only' },
+                { value: 'forgiving', label: '80% counts' },
+              ]}
+            />
+            <div className="mt-4 flex items-center justify-between px-1">
+              <span className="text-[15px]">Grace tokens</span>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => void updateArc(arc.id, { graceTokens: Math.max(0, arc.graceTokens - 1) })}
+                  className="press grid h-9 w-9 place-items-center rounded-full bg-white/[0.07] text-[18px]"
+                  aria-label="Fewer grace tokens"
+                >
+                  −
+                </button>
+                <span className="tnum w-5 text-center text-[17px] font-medium">{arc.graceTokens}</span>
+                <button
+                  onClick={() => void updateArc(arc.id, { graceTokens: Math.min(14, arc.graceTokens + 1) })}
+                  className="press grid h-9 w-9 place-items-center rounded-full bg-white/[0.07] text-[18px]"
+                  aria-label="More grace tokens"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
       <section className="mt-9">
@@ -116,20 +159,26 @@ export default function Contract({ data }: { data: ArcData }) {
         {active.length > 0 && (
           <List>
             {active.map((c) => (
-              <Row key={c.id} onClick={() => setEditing(c)}>
+              <Row key={c.id} onClick={locked ? undefined : () => setEditing(c)}>
                 <IconChip icon={c.icon} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15.5px] font-medium">{c.label}</div>
                   <div className="text-faint text-[12.5px]">{targetLabel(c)}</div>
                 </div>
-                <Chevron />
+                {c.important && <MustBadge />}
+                {!locked && <Chevron />}
               </Row>
             ))}
           </List>
         )}
-        <Button variant="secondary" className="mt-3" onClick={() => setAdding(true)}>
-          + Add commitment
-        </Button>
+        {!locked && (
+          <Button variant="secondary" className="mt-3" onClick={() => setAdding(true)}>
+            + Add commitment
+          </Button>
+        )}
+        <p className="text-faint mt-3 px-1 text-[12.5px] leading-snug">
+          Miss a <span className="text-ember">Must</span> and you owe 10 push-ups or squats, 5 more each month.
+        </p>
       </section>
 
       {adding && (
@@ -184,6 +233,7 @@ function CommitmentEditor({
   const [target, setTarget] = useState(String(commitment.target))
   const [timesPerWeek, setTimesPerWeek] = useState(commitment.timesPerWeek)
   const [cadence, setCadence] = useState(commitment.cadence)
+  const [important, setImportant] = useState(Boolean(commitment.important))
 
   return (
     <div className="space-y-5">
@@ -241,6 +291,25 @@ function CommitmentEditor({
         )}
       </div>
 
+      <button
+        onClick={() => setImportant(!important)}
+        className="press-row flex w-full items-center gap-3 rounded-[18px] bg-white/[0.04] px-4 py-3.5 text-left"
+        role="switch"
+        aria-checked={important}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-[15px] font-medium">Must</div>
+          <div className="text-faint text-[12.5px]">Missing it costs push-ups or squats</div>
+        </div>
+        <span
+          className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${important ? 'bg-ember' : 'bg-white/15'}`}
+        >
+          <span
+            className={`bg-fg absolute top-1 h-5 w-5 rounded-full transition-all ${important ? 'left-6' : 'left-1'}`}
+          />
+        </span>
+      </button>
+
       <div className="space-y-2 pt-1">
         <Button
           onClick={async () => {
@@ -249,6 +318,7 @@ function CommitmentEditor({
               target: Number(target) || commitment.target,
               cadence,
               timesPerWeek,
+              important,
             })
             onDone()
           }}

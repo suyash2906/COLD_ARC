@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CommitmentRow } from '../components/CommitmentRow'
 import { ParticleField } from '../components/ParticleField'
-import { EmptyState, Flame, IconChip, Label, List, Orb, Row, Screen } from '../components/ui'
-import { addDays, arcDay, arcEndDate, daysBetween, formatLong, type ISODate } from '../lib/dates'
-import { saveJournal, setDayMeta } from '../lib/actions'
+import { Button, EmptyState, Flame, IconChip, Label, List, Orb, Row, Screen } from '../components/ui'
+import { addDays, arcDay, arcEndDate, daysBetween, formatLong, formatShort, type ISODate } from '../lib/dates'
+import { contractLocked, markPenaltyDone, saveJournal, setDayMeta } from '../lib/actions'
+import { exerciseFor, owedPenalties, repsFor, summarize, type Penalty } from '../lib/penalties'
 import { scoreDay } from '../lib/scoring'
 import type { Arc, Commitment } from '../lib/types'
-import { useDayRecord, useJournal, type ArcData } from '../state/useArc'
+import { useDayRecord, useDayRecords, useJournal, type ArcData } from '../state/useArc'
 
 const MOODS = ['😵', '😕', '😐', '🙂', '🔥']
 
@@ -33,11 +34,58 @@ function Chevron({ dir }: { dir: 'left' | 'right' }) {
   )
 }
 
-const EditLink = () => (
+const ContractLink = ({ locked }: { locked: boolean }) => (
   <Link to="/contract" className="text-muted active:text-fg text-[13px]">
-    Edit
+    {locked ? 'View' : 'Edit'}
   </Link>
 )
+
+/** Musts missed on finished days, each one paid off with a tap once the reps are done. */
+function Owed({ arcId, penalties }: { arcId: string; penalties: Penalty[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const shown = expanded ? penalties : penalties.slice(0, 3)
+  const payAll = async () => {
+    for (const p of penalties) await markPenaltyDone(arcId, p.date, p.commitment.id)
+  }
+
+  return (
+    <section className="rise border-fail/25 bg-fail/[0.06] mt-6 rounded-[22px] border px-4 py-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-fail text-[13px] font-medium">You owe</div>
+        {penalties.length > 1 && (
+          <Button size="sm" variant="secondary" onClick={() => void payAll()}>
+            All done
+          </Button>
+        )}
+      </div>
+      <div className="display tnum mt-1 text-[26px]">{summarize(penalties)}</div>
+      <p className="text-muted mt-1 text-[12.5px]">For the musts you missed. Do them, then tick them off.</p>
+      <ul className="mt-3 divide-y divide-white/[0.06] border-t border-white/[0.06]">
+        {shown.map((p) => (
+          <li key={`${p.date}:${p.commitment.id}`} className="flex items-center gap-3 py-2.5">
+            <span className="text-[18px]">{p.commitment.icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[14.5px] font-medium">
+                {p.reps} {p.exercise}
+              </div>
+              <div className="text-faint truncate text-[12px]">
+                {p.commitment.label} · {formatShort(p.date)}
+              </div>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => void markPenaltyDone(arcId, p.date, p.commitment.id)}>
+              Done
+            </Button>
+          </li>
+        ))}
+      </ul>
+      {penalties.length > 3 && (
+        <button onClick={() => setExpanded(!expanded)} className="text-muted mt-1 w-full pt-2 text-center text-[12.5px]">
+          {expanded ? 'Show less' : `Show all ${penalties.length}`}
+        </button>
+      )}
+    </section>
+  )
+}
 
 export default function Today({ data }: { data: ArcData }) {
   const { arc, input, today } = data
@@ -51,6 +99,7 @@ export default function Today({ data }: { data: ArcData }) {
   const [journalDraft, setJournalDraft] = useState<string | null>(null)
 
   const evening = useIsEvening()
+  const records = useDayRecords(arc?.id)
 
   if (!arc || !input) return null
   if (today < arc.startDate) return <NotStarted arc={arc} today={today} commitments={data.commitments} />
@@ -63,6 +112,9 @@ export default function Today({ data }: { data: ArcData }) {
   const body = journalDraft ?? journal?.body ?? ''
   // A past day is over, so a low score there is already a miss; today gets until 6pm.
   const behind = day.total > 0 && day.score < LOW_SCORE && (date < today || evening)
+  const locked = contractLocked(arc, today)
+  const owed = owedPenalties(arc, data.commitments, data.allScores, records ?? [], today)
+  const costOf = (c: Commitment) => (c.important ? `${repsFor(arc, date)} ${exerciseFor(data.commitments, c)}` : undefined)
 
   return (
     <Screen>
@@ -73,6 +125,8 @@ export default function Today({ data }: { data: ArcData }) {
         <Flame count={data.streaks?.current ?? 0} />
       </header>
       <h1 className="display rise mt-2 text-[40px]">{isToday ? 'Today' : formatLong(date)}</h1>
+
+      {isToday && owed.length > 0 && <Owed arcId={arc.id} penalties={owed} />}
 
       <ParticleField progress={day.score} warn={behind} className="-mx-5 h-[300px]">
         <div className="flex h-full items-center justify-between px-6">
@@ -117,7 +171,7 @@ export default function Today({ data }: { data: ArcData }) {
       </div>
 
       <section className="mt-9">
-        <Label right={<EditLink />}>Your contract</Label>
+        <Label right={<ContractLink locked={locked} />}>Your contract</Label>
         {data.commitments.length === 0 ? (
           <EmptyState
             icon="📝"
@@ -127,7 +181,7 @@ export default function Today({ data }: { data: ArcData }) {
         ) : (
           <List>
             {day.results.map((r) => (
-              <CommitmentRow key={r.commitment.id} arc={arc} result={r} date={date} />
+              <CommitmentRow key={r.commitment.id} arc={arc} result={r} date={date} penalty={costOf(r.commitment)} />
             ))}
           </List>
         )}
@@ -198,17 +252,18 @@ function NotStarted({
       <p className="text-muted text-center text-[14.5px] leading-relaxed">
         Your arc begins {formatLong(arc.startDate)}.
         <br />
-        Nothing to log until then.
+        Tweak the rules until then. They lock on day one.
       </p>
 
       {active.length > 0 && (
         <section className="mt-9">
-          <Label right={<EditLink />}>Your contract</Label>
+          <Label right={<ContractLink locked={false} />}>Your contract</Label>
           <List>
             {active.map((c) => (
               <Row key={c.id}>
                 <IconChip icon={c.icon} />
-                <span className="truncate text-[15.5px] font-medium">{c.label}</span>
+                <span className="min-w-0 flex-1 truncate text-[15.5px] font-medium">{c.label}</span>
+                {c.important && <MustBadge />}
               </Row>
             ))}
           </List>
@@ -216,4 +271,8 @@ function NotStarted({
       )}
     </Screen>
   )
+}
+
+function MustBadge() {
+  return <span className="bg-ember/10 text-ember shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium">Must</span>
 }
