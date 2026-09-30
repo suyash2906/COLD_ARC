@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Reminders } from '../components/Reminders'
 import { Button, Label, List, Row, Screen, ScreenTitle } from '../components/ui'
 import { arcEnd, contractLocked, endArc, exportArc, importArc } from '../lib/actions'
 import { requestPersistence } from '../db/schema'
@@ -95,6 +96,8 @@ export default function Settings({ data }: { data: ArcData }) {
           </Row>
         </List>
       </section>
+
+      <Reminders />
 
       <section className="mt-9">
         <Label>Backup</Label>

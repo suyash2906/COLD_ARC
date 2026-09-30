@@ -46,7 +46,8 @@ export const clockToMinutes = (s: string) => {
 export const CONTRACT_PRESETS: ContractPreset[] = [
   {
     // Built for an 8-to-3 college day: rules that fit before 8 and after 3, aimed at
-    // losing fat and catching up on studies, with one run a week.
+    // losing fat and catching up on studies, with one run a week. Reminder times line up
+    // with the push schedule in .github/workflows/reminders.yml.
     id: 'cut-and-study',
     name: 'Cut & Study',
     tagline: 'Ten daily rules around an 8–3 college day. Lose fat, fix your grades, run once a week.',
@@ -55,16 +56,16 @@ export const CONTRACT_PRESETS: ContractPreset[] = [
     fixedDays: null,
     commitments: [
       t({ label: 'Wake up', icon: '🌅', kind: 'time', target: 360, direction: 'at_most', weight: 2, important: true }),
-      t({ label: 'Water', icon: '💧', kind: 'count', target: 3, unit: 'L' }),
-      t({ label: 'Steps', icon: '👟', kind: 'count', target: 8000, unit: 'steps' }),
-      t({ label: "Revise today's lectures", icon: '📝', kind: 'duration', target: 15, unit: 'min' }),
-      t({ label: 'Workout', icon: '💪', kind: 'duration', target: 20, unit: 'min', weight: 2, important: true }),
-      t({ label: 'Deep study, phone away', icon: '📚', kind: 'duration', target: 60, unit: 'min', weight: 2, important: true }),
+      t({ label: 'Water', icon: '💧', kind: 'count', target: 3, unit: 'L', remindAt: 1200 }),
+      t({ label: 'Steps', icon: '👟', kind: 'count', target: 8000, unit: 'steps', remindAt: 1260 }),
+      t({ label: "Revise today's lectures", icon: '📝', kind: 'duration', target: 15, unit: 'min', remindAt: 1140 }),
+      t({ label: 'Workout', icon: '💪', kind: 'duration', target: 20, unit: 'min', weight: 2, important: true, remindAt: 1200 }),
+      t({ label: 'Deep study, phone away', icon: '📚', kind: 'duration', target: 60, unit: 'min', weight: 2, important: true, remindAt: 1260 }),
       t({ label: 'No junk or sugary drinks', icon: '🥗', weight: 2, important: true }),
-      t({ label: 'Kitchen closed after 9 pm', icon: '🍽️' }),
+      t({ label: 'Kitchen closed after 9 pm', icon: '🍽️', remindAt: 1260 }),
       t({ label: 'Social media', icon: '📵', kind: 'duration', target: 60, direction: 'at_most', unit: 'min' }),
-      t({ label: 'In bed', icon: '🛏️', kind: 'time', target: 1380, direction: 'at_most' }),
-      t({ label: 'Run', icon: '🏃', cadence: 'n_per_week', timesPerWeek: 1, weight: 2, important: true }),
+      t({ label: 'In bed', icon: '🛏️', kind: 'time', target: 1380, direction: 'at_most', remindAt: 1350 }),
+      t({ label: 'Run', icon: '🏃', cadence: 'n_per_week', timesPerWeek: 1, weight: 2, important: true, remindAt: 1140 }),
     ],
   },
   {

@@ -49,6 +49,8 @@ export interface Commitment {
   weight: number
   /** A must: missing it on a day it was due costs push-ups or squats. */
   important?: boolean
+  /** Minutes past midnight after which a reminder names it if it is still undone. */
+  remindAt?: number | null
   order: number
   archivedAt: number | null
 }

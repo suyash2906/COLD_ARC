@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie'
+import { CONTRACT_PRESETS } from '../lib/presets'
 import type {
   Arc, Commitment, DayRecord, JournalEntry, LogEntry, Photo, Settings,
 } from '../lib/types'
@@ -29,6 +30,23 @@ class ColdArcDB extends Dexie {
     })
     // The squad upload queue is gone; drop its table and any rows still waiting in it.
     this.version(2).stores({ syncQueue: null })
+    // Reminder times arrived after some contracts were already signed. Give those tasks the
+    // preset's times; a task set to "None" (null) is left alone.
+    this.version(3)
+      .stores({})
+      .upgrade(async (tx) => {
+        const times = new Map<string, Map<string, number | null | undefined>>(
+          CONTRACT_PRESETS.map((p) => [p.id, new Map(p.commitments.map((c) => [c.label, c.remindAt]))]),
+        )
+        const presetOf = new Map((await tx.table<Arc>('arcs').toArray()).map((a) => [a.id, a.presetId]))
+        await tx
+          .table<Commitment>('commitments')
+          .toCollection()
+          .modify((c) => {
+            const at = times.get(presetOf.get(c.arcId) ?? '')?.get(c.label)
+            if (c.remindAt === undefined && typeof at === 'number') c.remindAt = at
+          })
+      })
   }
 }
 

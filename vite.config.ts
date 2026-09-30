@@ -49,6 +49,8 @@ export default defineConfig(({ command, isPreview }) => ({
         // of the app to close, which on an iPhone can mean never.
         skipWaiting: true,
         clientsClaim: true,
+        // Push and notification-tap handlers for reminders.
+        importScripts: ['push-sw.js'],
       },
       devOptions: { enabled: false },
     }),

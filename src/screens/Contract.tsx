@@ -163,7 +163,10 @@ export default function Contract({ data }: { data: ArcData }) {
                 <IconChip icon={c.icon} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15.5px] font-medium">{c.label}</div>
-                  <div className="text-faint text-[12.5px]">{targetLabel(c)}</div>
+                  <div className="text-faint text-[12.5px]">
+                    {targetLabel(c)}
+                    {c.remindAt != null && ` · ⏰ ${minutesToClock(c.remindAt)}`}
+                  </div>
                 </div>
                 {c.important && <MustBadge />}
                 {!locked && <Chevron />}
@@ -234,6 +237,7 @@ function CommitmentEditor({
   const [timesPerWeek, setTimesPerWeek] = useState(commitment.timesPerWeek)
   const [cadence, setCadence] = useState(commitment.cadence)
   const [important, setImportant] = useState(Boolean(commitment.important))
+  const [remindAt, setRemindAt] = useState<number | null>(commitment.remindAt ?? null)
 
   return (
     <div className="space-y-5">
@@ -291,6 +295,26 @@ function CommitmentEditor({
         )}
       </div>
 
+      <div>
+        <span className="text-muted mb-1.5 block px-1 text-[13px]">Remind me at</span>
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            value={remindAt === null ? '' : minutesToClock(remindAt)}
+            onChange={(e) => setRemindAt(e.target.value ? clockToMinutes(e.target.value) : null)}
+            className="field tnum min-w-0 flex-1"
+          />
+          {remindAt !== null && (
+            <Button size="sm" variant="secondary" onClick={() => setRemindAt(null)}>
+              None
+            </Button>
+          )}
+        </div>
+        <span className="text-faint mt-1.5 block px-1 text-[12px]">
+          Named in the next reminder after this time if it is still undone.
+        </span>
+      </div>
+
       <button
         onClick={() => setImportant(!important)}
         className="press-row flex w-full items-center gap-3 rounded-[18px] bg-white/[0.04] px-4 py-3.5 text-left"
@@ -319,6 +343,7 @@ function CommitmentEditor({
               cadence,
               timesPerWeek,
               important,
+              remindAt,
             })
             onDone()
           }}

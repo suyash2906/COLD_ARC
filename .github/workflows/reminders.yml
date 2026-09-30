@@ -1,0 +1,41 @@
+name: Reminders
+
+# Sends an empty push to the phone at set times. The phone checks its own tasks and says
+# what is still undone, so no task data goes through here. Times are IST (UTC+5:30),
+# written in UTC below, and must match REMINDER_TIMES in src/lib/push.ts.
+#
+# GitHub may start scheduled runs a few minutes late, and pauses schedules on a repo with
+# no activity for 60 days (one click on the Actions tab turns it back on).
+on:
+  schedule:
+    - cron: '30 13 * * *' # 7:00 pm
+    - cron: '30 14 * * *' # 8:00 pm
+    - cron: '30 15 * * *' # 9:00 pm
+    - cron: '0 17 * * *' # 10:30 pm
+  workflow_dispatch:
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send the reminder
+        env:
+          PUSH_SUBSCRIPTION: ${{ secrets.PUSH_SUBSCRIPTION }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          VAPID_PUBLIC_KEY: BIkyvH868wje4u6oZtUamJkDhl0XjuXObaFqE8VIo32aDGvEBMoE-JdQunCrigFXpHQFfY-30ClHFZR6r0GJ38Q
+          # A manual run from the Actions tab sends a test.
+          PAYLOAD: ${{ github.event_name == 'workflow_dispatch' && '{"test":true}' || '{}' }}
+        run: |
+          if [ -z "$PUSH_SUBSCRIPTION" ] || [ -z "$VAPID_PRIVATE_KEY" ]; then
+            echo "Reminders are not set up yet: add the PUSH_SUBSCRIPTION and VAPID_PRIVATE_KEY secrets."
+            exit 0
+          fi
+          npx --yes web-push@3.6.7 send-notification \
+            --endpoint="$(jq -r .endpoint <<<"$PUSH_SUBSCRIPTION")" \
+            --key="$(jq -r .keys.p256dh <<<"$PUSH_SUBSCRIPTION")" \
+            --auth="$(jq -r .keys.auth <<<"$PUSH_SUBSCRIPTION")" \
+            --payload="$PAYLOAD" \
+            --ttl=1800 \
+            --vapid-subject="https://suyash2906.github.io/COLD_ARC/" \
+            --vapid-pubkey="$VAPID_PUBLIC_KEY" \
+            --vapid-pvtkey="$VAPID_PRIVATE_KEY"
