@@ -1,19 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { setLogValue, toggleCommitment } from '../lib/actions'
-import { clockToMinutes, formatAmount, minutesToClock } from '../lib/presets'
+import { clockToMinutes, formatQuantity, minutesToClock } from '../lib/presets'
 import type { CommitmentResult } from '../lib/scoring'
-import type { Arc } from '../lib/types'
+import type { Arc, Commitment } from '../lib/types'
 import { IconChip } from './ui'
 
-/** Step size that feels right whether the target is 3.8 litres or 10,000 steps. */
-function stepFor(target: number): number {
-  if (target <= 5) return 0.5
-  if (target <= 100) return 5
-  if (target <= 1000) return 50
-  return 500
+const trim = (n: number) => Number(n.toFixed(2)).toString()
+
+/** Slider range and step: fine enough for 250 ml of water, coarse enough for 8,000 steps. */
+function sliderSpec(c: Commitment): { step: number; max: number } {
+  const step = c.unit === 'L' || c.target <= 5 ? 0.25 : c.target <= 100 ? 5 : c.target <= 1000 ? 25 : 100
+  const room = c.direction === 'at_most' ? c.target * 2 : c.target * 1.5
+  return { step, max: Math.ceil(room / step) * step }
 }
 
-const trim = (n: number) => Number(n.toFixed(2)).toString()
+// Grow for 1s, hold for 0.5s, settle over 0.75s: "this one is still waiting on you".
+const NUDGE_MS = 2250
+const NUDGE_EASE = 'cubic-bezier(0.45, 0, 0.25, 1)'
+const NUDGE_FRAMES: Keyframe[] = [
+  { transform: 'scale(1)', backgroundColor: 'rgb(255 154 82 / 0)', easing: NUDGE_EASE },
+  { transform: 'scale(1.045)', backgroundColor: 'rgb(255 154 82 / 0.07)', offset: 1000 / NUDGE_MS },
+  { transform: 'scale(1.045)', backgroundColor: 'rgb(255 154 82 / 0.07)', offset: 1500 / NUDGE_MS, easing: NUDGE_EASE },
+  { transform: 'scale(1)', backgroundColor: 'rgb(255 154 82 / 0)' },
+]
 
 function Check({ on, dim }: { on: boolean; dim?: boolean }) {
   return (
@@ -51,21 +60,27 @@ export function CommitmentRow({
   result,
   date,
   penalty,
+  nudge = 0,
+  nudgeDelay = 0,
 }: {
   arc: Arc
   result: CommitmentResult
   date: string
   /** What missing this costs, for musts that are due. */
   penalty?: string
+  /** Bump this to play the "still to do" zoom once. Zero means leave it alone. */
+  nudge?: number
+  nudgeDelay?: number
 }) {
-  const { commitment: c, satisfied, value, scheduled, fraction } = result
-  const [editing, setEditing] = useState(false)
-  const [draft, setDraft] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
+  const { commitment: c, satisfied, value, scheduled } = result
+  const rootRef = useRef<HTMLDivElement & HTMLButtonElement>(null)
 
   useEffect(() => {
-    if (editing) inputRef.current?.focus()
-  }, [editing])
+    const el = rootRef.current
+    if (!nudge || !el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const animation = el.animate(NUDGE_FRAMES, { duration: NUDGE_MS, delay: nudgeDelay })
+    return () => animation.cancel()
+  }, [nudge, nudgeDelay])
 
   const commit = (v: number | null) => void setLogValue(arc, c, date, v)
 
@@ -75,16 +90,11 @@ export function CommitmentRow({
   // Only warn while it can still be saved.
   const cost = satisfied || optional ? undefined : penalty
 
-  const hint = (() => {
-    if (c.kind === 'bool') return optional ? 'Optional today' : c.cadence === 'n_per_week' ? `${c.timesPerWeek}× a week` : ''
-    if (c.kind === 'time') return `${c.direction === 'at_most' ? 'by' : 'after'} ${minutesToClock(c.target)}`
-    const dir = c.direction === 'at_most' ? 'under ' : ''
-    return `${dir}${formatAmount(c.target)} ${c.unit}`
-  })()
-
   if (c.kind === 'bool') {
+    const hint = optional ? 'Optional today' : c.cadence === 'n_per_week' ? `${c.timesPerWeek}× a week` : ''
     return (
       <button
+        ref={rootRef}
         onClick={() => void toggleCommitment(arc, c, date, !satisfied)}
         className="press-row flex w-full items-center gap-3.5 px-4 py-3.5 text-left"
       >
@@ -105,12 +115,12 @@ export function CommitmentRow({
 
   if (c.kind === 'time') {
     return (
-      <div className="flex items-center gap-3.5 px-4 py-3.5">
+      <div ref={rootRef} className="flex items-center gap-3.5 px-4 py-3.5">
         <IconChip icon={c.icon} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15.5px] font-medium">{c.label}</div>
           <div className="text-faint text-[12.5px]">
-            {hint}
+            {c.direction === 'at_most' ? 'by' : 'after'} {minutesToClock(c.target)}
             <Cost penalty={cost} />
           </div>
         </div>
@@ -127,75 +137,121 @@ export function CommitmentRow({
     )
   }
 
-  // count | duration
-  const step = stepFor(c.target)
-  const current = value ?? 0
-  const pct = Math.round(fraction * 100)
+  return <AmountRow rootRef={rootRef} commit={commit} result={result} cost={cost} />
+}
+
+/** count | duration: drag a slider to the amount, or tap the number to type it. */
+function AmountRow({
+  rootRef,
+  commit,
+  result,
+  cost,
+}: {
+  rootRef: RefObject<(HTMLDivElement & HTMLButtonElement) | null>
+  commit: (v: number | null) => void
+  result: CommitmentResult
+  cost?: string
+}) {
+  const { commitment: c, satisfied, value } = result
+  const { step, max } = sliderSpec(c)
+  const [slide, setSlide] = useState<number | null>(null)
+  const [typing, setTyping] = useState<string | null>(null)
+  const timer = useRef<number | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // A saved value (or a Health sync) replaces whatever the slider was showing.
+  const [seen, setSeen] = useState(value)
+  if (seen !== value) {
+    setSeen(value)
+    setSlide(null)
+  }
+
+  useEffect(() => {
+    if (typing !== null) inputRef.current?.focus()
+  }, [typing])
+
+  useEffect(
+    () => () => {
+      if (timer.current) window.clearTimeout(timer.current)
+    },
+    [],
+  )
+
+  const shown = slide ?? value ?? 0
+  const save = (v: number) => {
+    if (timer.current) window.clearTimeout(timer.current)
+    timer.current = null
+    commit(v > 0 ? v : null)
+  }
+  // Save shortly after the finger stops, so dragging doesn't write on every pixel.
+  const move = (v: number) => {
+    setSlide(v)
+    if (timer.current) window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => save(v), 350)
+  }
+
+  const over = c.direction === 'at_most' && shown > c.target
+  const fill = satisfied && !over ? 'var(--color-ice-300)' : over ? 'var(--color-fail)' : 'rgb(255 255 255 / 0.7)'
+  const pct = Math.min(100, (shown / max) * 100)
+  const goal = Math.min(1, c.target / max)
 
   return (
-    <div className="relative px-4 py-3.5">
-      {/* A hairline of progress along the bottom edge, instead of filling the whole row. */}
-      <div className="absolute inset-x-4 bottom-0 h-px overflow-hidden" aria-hidden>
-        <div
-          className="bg-ice-300 h-full shadow-[0_0_8px_rgb(163_224_255/0.8)] transition-[width] duration-500"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+    <div ref={rootRef} className="px-4 pt-3.5 pb-2.5">
       <div className="flex items-center gap-3.5">
         <IconChip icon={c.icon} />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[15.5px] font-medium">{c.label}</div>
-          {editing ? (
-            <input
-              ref={inputRef}
-              type="number"
-              inputMode="decimal"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={() => {
-                setEditing(false)
-                const n = parseFloat(draft)
-                commit(Number.isFinite(n) && n >= 0 ? n : null)
-              }}
-              onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.blur()}
-              className="text-ice-300 tnum w-24 bg-transparent text-[12.5px] outline-none"
-            />
-          ) : (
-            <button
-              onClick={() => {
-                setDraft(value === null ? '' : trim(value))
-                setEditing(true)
-              }}
-              className="tnum text-faint text-[12.5px]"
-            >
-              <span className={satisfied ? 'text-ice-300' : value !== null ? 'text-muted' : ''}>
-                {value === null ? '—' : formatAmount(value)}
-              </span>
-              {' / '}
-              {hint}
-              <Cost penalty={cost} />
-            </button>
-          )}
+          <div className="text-faint text-[12.5px]">
+            {c.direction === 'at_most' ? 'under' : 'goal'} {formatQuantity(c.target, c.unit)}
+            <Cost penalty={cost} />
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        {typing !== null ? (
+          <input
+            ref={inputRef}
+            type="number"
+            inputMode="decimal"
+            value={typing}
+            onChange={(e) => setTyping(e.target.value)}
+            onBlur={() => {
+              const n = parseFloat(typing)
+              setTyping(null)
+              save(Number.isFinite(n) && n >= 0 ? n : 0)
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.blur()}
+            className="tnum w-20 shrink-0 rounded-full bg-white/[0.07] px-3 py-1 text-right text-[15px] outline-none"
+          />
+        ) : (
           <button
-            onClick={() => commit(Math.max(0, current - step) || null)}
-            disabled={value === null}
-            className="press text-fg grid h-9 w-9 place-items-center rounded-full bg-white/[0.07] text-[18px] leading-none disabled:opacity-30"
-            aria-label={`Decrease ${c.label}`}
+            onClick={() => setTyping(value === null ? '' : trim(value))}
+            className={`tnum shrink-0 text-[15px] font-medium ${over ? 'text-fail' : satisfied ? 'text-ice-300' : shown ? 'text-fg' : 'text-faint'}`}
+            aria-label={`Type an amount for ${c.label}`}
           >
-            −
+            {shown ? formatQuantity(shown, c.unit) : '—'}
           </button>
-          <button
-            onClick={() => commit(current + step)}
-            className={`press grid h-9 w-9 place-items-center rounded-full text-[18px] leading-none ${
-              satisfied ? 'bg-fg text-ink' : 'text-fg bg-white/[0.07]'
-            }`}
-            aria-label={`Increase ${c.label}`}
-          >
-            +
-          </button>
-        </div>
+        )}
+      </div>
+
+      <div className="relative mt-1 ml-[50px]">
+        {/* Where the goal sits on the track. */}
+        <span
+          className="pointer-events-none absolute top-1/2 h-3 w-0.5 -translate-y-1/2 rounded-full bg-white/35"
+          style={{ left: `calc(12px + (100% - 24px) * ${goal})` }}
+          aria-hidden
+        />
+        <input
+          type="range"
+          min={0}
+          max={max}
+          step={step}
+          value={shown}
+          onChange={(e) => move(Number(e.target.value))}
+          onPointerUp={() => slide !== null && save(slide)}
+          onTouchEnd={() => slide !== null && save(slide)}
+          aria-label={c.label}
+          className="range"
+          style={{ ['--pct' as string]: `${pct}%`, ['--fill' as string]: fill }}
+        />
       </div>
     </div>
   )

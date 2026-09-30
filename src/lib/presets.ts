@@ -30,6 +30,12 @@ function t(over: Partial<CommitmentTemplate> & Pick<CommitmentTemplate, 'label' 
 /** 8000 -> "8,000", 3.8 -> "3.8". */
 export const formatAmount = (n: number) => Number(n.toFixed(2)).toLocaleString('en-US')
 
+/** An amount with its unit, switching litres to millilitres below one: "500 ml", "2.5 L", "8,000 steps". */
+export function formatQuantity(n: number, unit: string): string {
+  if (unit === 'L' && n > 0 && n < 1) return `${Math.round(n * 1000)} ml`
+  return unit ? `${formatAmount(n)} ${unit}` : formatAmount(n)
+}
+
 /** `time` targets are minutes past midnight, so 05:30 is 330. */
 export const minutesToClock = (m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m) % 60).padStart(2, '0')}`
 export const clockToMinutes = (s: string) => {

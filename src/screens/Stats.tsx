@@ -1,3 +1,4 @@
+import { ThisWeek } from '../components/ThisWeek'
 import { IconChip, Label, List, Screen, ScreenTitle, Stat } from '../components/ui'
 import { scoreColor } from '../lib/color'
 import { formatShort } from '../lib/dates'
@@ -5,8 +6,8 @@ import { streakThreshold } from '../lib/scoring'
 import type { ArcData } from '../state/useArc'
 
 export default function Stats({ data }: { data: ArcData }) {
-  const { arc, streaks, weeks, rates, commitments } = data
-  if (!arc || !streaks) return null
+  const { arc, streaks, weeks, rates, commitments, input, today } = data
+  if (!arc || !streaks || !input) return null
 
   const pace = Math.round((streaks.elapsed / arc.totalDays) * 100)
   const weekAvg = weeks.map((w) => Math.round(w.total / w.days.length))
@@ -53,6 +54,8 @@ export default function Stats({ data }: { data: ArcData }) {
           </div>
         </div>
       )}
+
+      <ThisWeek commitments={commitments} logs={input.logs} today={today} />
 
       <section className="mt-10">
         <Label right={weeks.length > 0 && <span className="text-faint tnum text-[12.5px]">Best {best}</span>}>

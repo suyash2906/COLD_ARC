@@ -1,8 +1,9 @@
-import { dayId, db, logId } from '../db/schema'
+import { dayId, db, logId, setSetting } from '../db/schema'
 import type { ISODate } from './dates'
+import { stepsCommitment, workoutCommitment, type HealthDays } from './health'
 import { daysToEnd } from './presets'
 import type { CommitmentTemplate } from './presets'
-import type { Arc, Commitment, Strictness } from './types'
+import type { Arc, Commitment, LogEntry, Strictness } from './types'
 
 const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`)
 
@@ -128,6 +129,49 @@ export async function setDayMeta(
     ...existing,
     ...patch,
   })
+}
+
+/** A workout at least this long ticks a yes/no training habit. */
+const WORKOUT_COUNTS_MINUTES = 20
+
+/**
+ * Writes pasted Health numbers into the arc: steps into the steps habit, workout minutes
+ * into the workout habit. Only days inside the arc up to today are touched, and a number
+ * never goes down, so a manual entry above Health's count stays.
+ */
+export async function importHealth(
+  arc: Arc,
+  commitments: Commitment[],
+  health: HealthDays,
+  today: ISODate,
+): Promise<{ days: number; steps: boolean; workout: boolean }> {
+  const steps = stepsCommitment(commitments)
+  const workout = workoutCommitment(commitments)
+  const last = arcEnd(arc) < today ? arcEnd(arc) : today
+  const inArc = (date: ISODate) => date >= arc.startDate && date <= last
+  const writes: LogEntry[] = []
+
+  const put = async (c: Commitment, date: ISODate, value: number) => {
+    if (value <= 0) return
+    const id = logId(c.id, date)
+    const existing = await db.logs.get(id)
+    if (existing && existing.value >= value) return
+    writes.push({ id, arcId: arc.id, commitmentId: c.id, date, value, loggedAt: Date.now() })
+  }
+
+  if (steps) {
+    for (const [date, n] of health.steps) if (inArc(date)) await put(steps, date, Math.round(n))
+  }
+  if (workout) {
+    for (const [date, minutes] of health.workoutMinutes) {
+      if (!inArc(date)) continue
+      await put(workout, date, workout.kind === 'bool' ? Number(minutes >= WORKOUT_COUNTS_MINUTES) : Math.round(minutes))
+    }
+  }
+
+  await db.logs.bulkPut(writes)
+  await setSetting('healthSyncedAt', Date.now())
+  return { days: new Set(writes.map((w) => w.date)).size, steps: Boolean(steps), workout: Boolean(workout) }
 }
 
 export async function markPenaltyDone(arcId: string, date: ISODate, commitmentId: string): Promise<void> {

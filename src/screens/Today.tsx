@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CommitmentRow } from '../components/CommitmentRow'
+import { HealthSync } from '../components/HealthSync'
 import { ParticleField } from '../components/ParticleField'
+import { ReorderList } from '../components/ReorderList'
 import { Button, EmptyState, Flame, IconChip, Label, List, Orb, Row, Screen } from '../components/ui'
 import { addDays, arcDay, arcEndDate, daysBetween, formatLong, formatShort, type ISODate } from '../lib/dates'
-import { contractLocked, markPenaltyDone, saveJournal, setDayMeta } from '../lib/actions'
+import { contractLocked, markPenaltyDone, reorderCommitments, saveJournal, setDayMeta } from '../lib/actions'
 import { exerciseFor, owedPenalties, repsFor, summarize, type Penalty } from '../lib/penalties'
 import { scoreDay } from '../lib/scoring'
 import type { Arc, Commitment } from '../lib/types'
@@ -15,6 +17,26 @@ const MOODS = ['😵', '😕', '😐', '🙂', '🔥']
 /** After this hour, a day that is still mostly undone turns the particles red. */
 const EVENING_HOUR = 18
 const LOW_SCORE = 40
+
+/** From 3pm, opening the app zooms each task that is still undone. */
+const NUDGE_HOUR = 15
+const NUDGE_STAGGER_MS = 90
+
+/**
+ * Counts app opens after 3pm: the first render, plus every return to the foreground.
+ * Each bump replays the zoom on the tasks still left.
+ */
+function useNudge(): number {
+  const [count, setCount] = useState(() => (new Date().getHours() >= NUDGE_HOUR ? 1 : 0))
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && new Date().getHours() >= NUDGE_HOUR) setCount((n) => n + 1)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+  return count
+}
 
 /** True from 6pm local time, re-checked every minute so the warning switches on by itself. */
 function useIsEvening(): boolean {
@@ -99,7 +121,9 @@ export default function Today({ data }: { data: ArcData }) {
   const [journalDraft, setJournalDraft] = useState<string | null>(null)
 
   const evening = useIsEvening()
+  const nudge = useNudge()
   const records = useDayRecords(arc?.id)
+  const [reordering, setReordering] = useState(false)
 
   if (!arc || !input) return null
   if (today < arc.startDate) return <NotStarted arc={arc} today={today} commitments={data.commitments} />
@@ -115,6 +139,8 @@ export default function Today({ data }: { data: ArcData }) {
   const locked = contractLocked(arc, today)
   const owed = owedPenalties(arc, data.commitments, data.allScores, records ?? [], today)
   const costOf = (c: Commitment) => (c.important ? `${repsFor(arc, date)} ${exerciseFor(data.commitments, c)}` : undefined)
+  // Stagger the zoom down the list, counting only the tasks it applies to.
+  let dueIndex = 0
 
   return (
     <Screen>
@@ -171,18 +197,54 @@ export default function Today({ data }: { data: ArcData }) {
       </div>
 
       <section className="mt-9">
-        <Label right={<ContractLink locked={locked} />}>Your contract</Label>
+        <Label
+          right={
+            reordering ? (
+              <button onClick={() => setReordering(false)} className="text-fg text-[13px] font-medium">
+                Done
+              </button>
+            ) : (
+              <span className="flex items-center gap-4">
+                {data.commitments.length > 1 && (
+                  <button onClick={() => setReordering(true)} className="text-muted active:text-fg text-[13px]">
+                    Reorder
+                  </button>
+                )}
+                <ContractLink locked={locked} />
+              </span>
+            )
+          }
+        >
+          Your contract
+        </Label>
+        {isToday && !reordering && <HealthSync arc={arc} commitments={data.commitments} today={today} />}
         {data.commitments.length === 0 ? (
           <EmptyState
             icon="📝"
             title="No commitments yet"
             body="Your contract is empty. Add the handful of things you are going to hold yourself to."
           />
+        ) : reordering ? (
+          <ReorderList
+            items={data.commitments.filter((c) => !c.archivedAt)}
+            onChange={(ids) => void reorderCommitments(ids)}
+          />
         ) : (
           <List>
-            {day.results.map((r) => (
-              <CommitmentRow key={r.commitment.id} arc={arc} result={r} date={date} penalty={costOf(r.commitment)} />
-            ))}
+            {day.results.map((r) => {
+              const due = isToday && r.scheduled && !r.satisfied
+              return (
+                <CommitmentRow
+                  key={r.commitment.id}
+                  arc={arc}
+                  result={r}
+                  date={date}
+                  penalty={costOf(r.commitment)}
+                  nudge={due ? nudge : 0}
+                  nudgeDelay={due ? dueIndex++ * NUDGE_STAGGER_MS : 0}
+                />
+              )
+            })}
           </List>
         )}
       </section>
