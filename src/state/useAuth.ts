@@ -13,8 +13,26 @@ export interface AuthState {
   phase: AuthPhase
   session: Session | null
   profile: Profile | null
+  /** Why the last GitHub round trip failed, if it did (for example, it was cancelled). */
+  redirectError: string | null
   refresh: () => Promise<void>
 }
+
+/**
+ * GitHub sends people back with `?error_description=` when sign-in does not finish. Read it
+ * once at startup and strip it, so a reload does not show the same error again.
+ */
+function takeRedirectError(): string | null {
+  if (typeof window === 'undefined') return null
+  const url = new URL(window.location.href)
+  if (!url.searchParams.has('error') && !url.searchParams.has('error_description')) return null
+  const message = url.searchParams.get('error_description') ?? 'Sign-in did not finish.'
+  for (const key of ['error', 'error_code', 'error_description']) url.searchParams.delete(key)
+  window.history.replaceState(window.history.state, '', url.toString())
+  return message
+}
+
+const redirectError = takeRedirectError()
 
 export function useAuth(): AuthState {
   const [session, setSession] = useState<Session | null>(null)
@@ -38,59 +56,55 @@ export function useAuth(): AuthState {
 
   useEffect(() => {
     if (!supabase) return
-    void refresh()
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
+    // INITIAL_SESSION fires straight away, so this one listener covers startup, landing
+    // back from GitHub, and signing out.
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next)
-      if (next?.user) void loadProfile(next.user.id)
-      else {
+      if (!next?.user) {
         setProfile(null)
         setPhase('signed-out')
+        return
       }
+      if (event === 'TOKEN_REFRESHED') return
+      const userId = next.user.id
+      // Supabase holds a lock while this callback runs, and querying from inside it can
+      // deadlock. Defer until the callback has returned.
+      setTimeout(() => void loadProfile(userId), 0)
     })
     return () => sub.subscription.unsubscribe()
-  }, [refresh, loadProfile])
+  }, [loadProfile])
 
-  return { phase, session, profile, refresh }
+  return { phase, session, profile, redirectError, refresh }
 }
 
-export async function sendMagicLink(email: string): Promise<void> {
+/**
+ * Sends the whole app to GitHub and back. Unlike an emailed link, the round trip starts
+ * and ends in this app's own window, so the installed iPhone app keeps its own session.
+ */
+export async function signInWithGitHub(): Promise<void> {
   if (!supabase) throw new Error('Cloud not configured')
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: authRedirectUrl() },
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'github',
+    options: { redirectTo: authRedirectUrl() },
   })
   if (error) throw error
 }
 
-/**
- * An installed PWA has its own storage, separate from Safari. A magic link tapped in
- * Mail opens in Safari, so the session lands in the wrong box and the PWA never sees
- * it — and PKCE fails outright, since the code verifier lives in the PWA's storage.
- *
- * Typing the emailed code keeps the whole exchange inside the app, where it belongs.
- */
-export async function verifyEmailCode(email: string, token: string): Promise<void> {
-  if (!supabase) throw new Error('Cloud not configured')
-  const clean = { email: email.trim(), token: token.trim() }
-
-  // A first-ever sign-in is a signup confirmation; a returning user gets a magic-link
-  // OTP. The generic 'email' type covers both on most versions, but fall back rather
-  // than tell someone their correct code is wrong.
-  const attempts = ['email', 'signup', 'magiclink'] as const
-  let lastError: Error | null = null
-
-  for (const type of attempts) {
-    const { error } = await supabase.auth.verifyOtp({ ...clean, type })
-    if (!error) return
-    lastError = error
-    // A wrong or expired code is final — only retry when the *type* was the problem.
-    if (/expired|invalid/i.test(error.message) && !/type/i.test(error.message)) break
-  }
-  throw lastError ?? new Error('Could not verify that code.')
-}
-
 export async function signOut(): Promise<void> {
   await supabase?.auth.signOut()
+}
+
+/** A handle suggestion from the GitHub username, cleaned up to fit the handle rules. */
+export function suggestedHandle(session: Session | null): string {
+  const raw = session?.user.user_metadata?.user_name
+  if (typeof raw !== 'string') return ''
+  return raw.toLowerCase().replace(/-/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 20)
+}
+
+/** The GitHub display name, if there is one. */
+export function suggestedName(session: Session | null): string {
+  const raw = session?.user.user_metadata?.full_name ?? session?.user.user_metadata?.name
+  return typeof raw === 'string' ? raw.slice(0, 40) : ''
 }
 
 export async function claimProfile(handle: string, displayName: string, emoji: string): Promise<void> {

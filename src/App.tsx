@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { requestPersistence } from './db/schema'
-import { SyncIndicator, useSyncEngine } from './components/SyncIndicator'
+import { SyncIndicator } from './components/SyncIndicator'
+import { Spinner } from './components/ui'
 import { useArcData } from './state/useArc'
+import { useSyncEngine } from './state/useSyncEngine'
 import Onboarding from './screens/Onboarding'
 import Today from './screens/Today'
 import Grid from './screens/Grid'
@@ -19,36 +21,38 @@ const TABS = [
   { to: '/settings', label: 'More', icon: 'M4 6h16M4 12h16M4 18h16' },
 ]
 
+/** Floats above the content as a pill, the way the nav does on a launch page. */
 function TabBar() {
   return (
-    <nav className="border-line-soft bg-ink/85 fixed inset-x-0 bottom-0 z-40 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
-      <div className="mx-auto flex max-w-lg">
+    <nav className="fixed inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-4">
+      <div className="flex w-full max-w-[26rem] rounded-full border border-white/[0.08] bg-[#0f0f12]/80 p-1.5 shadow-[0_12px_40px_rgb(0_0_0/0.7)] backdrop-blur-xl">
         {TABS.map((t) => (
           <NavLink
             key={t.to}
             to={t.to}
             end={t.to === '/'}
             className={({ isActive }) =>
-              `flex flex-1 flex-col items-center gap-1 py-2.5 transition-colors ${
-                isActive ? 'text-ice-400' : 'text-faint'
+              `press flex flex-1 flex-col items-center gap-0.5 rounded-full py-2 ${
+                isActive ? 'text-fg bg-white/[0.1]' : 'text-white/40'
               }`
             }
           >
             {({ isActive }) => (
               <>
                 <svg
-                  width="21"
-                  height="21"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth={isActive ? 2.2 : 1.8}
+                  strokeWidth={isActive ? 2.1 : 1.8}
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  aria-hidden
                 >
                   <path d={t.icon} />
                 </svg>
-                <span className="text-[10px] font-medium tracking-wide">{t.label}</span>
+                <span className="text-[10px] font-medium">{t.label}</span>
               </>
             )}
           </NavLink>
@@ -61,7 +65,11 @@ function TabBar() {
 /** Routing keeps the scroll position between tabs otherwise, which feels broken on mobile. */
 function ScrollReset() {
   const { pathname } = useLocation()
-  useEffect(() => window.scrollTo(0, 0), [pathname])
+  useEffect(() => {
+    // Braces matter: newer browsers return a Promise from scrollTo, and an effect that
+    // returns anything but a function crashes React on the next route change.
+    window.scrollTo(0, 0)
+  }, [pathname])
   return null
 }
 
@@ -77,7 +85,7 @@ export default function App() {
   if (data.loading) {
     return (
       <div className="grid min-h-dvh place-items-center">
-        <div className="border-line border-t-ice-400 h-7 w-7 animate-spin rounded-full border-2" />
+        <Spinner />
       </div>
     )
   }

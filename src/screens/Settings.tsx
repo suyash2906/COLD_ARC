@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Button, Screen, ScreenTitle } from '../components/ui'
-import { endArc, exportArc, importArc } from '../lib/actions'
+import { Button, Label, List, Row, Screen, ScreenTitle } from '../components/ui'
+import { arcEnd, endArc, exportArc, importArc } from '../lib/actions'
 import { requestPersistence } from '../db/schema'
 import { formatShort } from '../lib/dates'
-import { arcEnd } from '../lib/actions'
 import type { ArcData } from '../state/useArc'
 
 const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -52,68 +51,60 @@ export default function Settings({ data }: { data: ArcData }) {
       <ScreenTitle title="More" />
 
       {!installed && (
-        <section className="card border-ice-400/30 bg-ice-400/[0.05] mb-2.5 px-4 py-4">
-          <div className="text-[15px] font-semibold">Put it on your home screen</div>
+        <section className="rise mb-9 rounded-[22px] border border-white/[0.08] bg-[radial-gradient(120%_140%_at_0%_0%,rgb(111_203_255/0.14),transparent_60%)] px-5 py-5">
+          <div className="display text-[20px]">Put it on your home screen</div>
           {isIOS() ? (
-            <ol className="text-muted mt-2.5 space-y-1.5 text-[13px] leading-relaxed">
+            <ol className="text-muted mt-3 space-y-1.5 text-[14px] leading-relaxed">
               <li>1. Open this page in Safari</li>
-              <li>
-                2. Tap Share <span className="text-fg">􀈂</span> at the bottom
-              </li>
+              <li>2. Tap Share at the bottom</li>
               <li>
                 3. Choose <span className="text-fg font-medium">Add to Home Screen</span>
               </li>
             </ol>
           ) : (
-            <p className="text-muted mt-2 text-[13px] leading-relaxed">
+            <p className="text-muted mt-2.5 text-[14px] leading-relaxed">
               Use your browser menu and choose Install app or Add to Home Screen.
             </p>
           )}
-          <p className="text-faint mt-3 text-[12px] leading-snug">
+          <p className="text-faint mt-3 text-[12.5px] leading-snug">
             Installing is what makes it open full-screen, work offline, and keeps iOS from clearing your data.
           </p>
         </section>
       )}
 
-      <section className="card px-4 py-4">
-        <div className="text-faint mb-3 text-[10px] font-semibold tracking-[0.09em] uppercase">Your arc</div>
-        <dl className="space-y-2 text-[13.5px]">
-          <div className="flex justify-between">
-            <dt className="text-muted">Contract</dt>
-            <dd>{arc.name}</dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">Window</dt>
-            <dd>
-              {formatShort(arc.startDate)} → {formatShort(arcEnd(arc))}
-            </dd>
-          </div>
-          <div className="flex justify-between">
-            <dt className="text-muted">Progress</dt>
-            <dd className="tnum">
-              {streaks?.elapsed ?? 0} / {arc.totalDays} days
-            </dd>
-          </div>
-        </dl>
-        <button
-          onClick={() => nav('/contract')}
-          className="press border-line text-ice-400 mt-3.5 w-full rounded-xl border py-2.5 text-[13.5px] font-medium"
-        >
-          Edit contract
-        </button>
+      <section className="rise">
+        <Label>Your arc</Label>
+        <List>
+          {[
+            ['Contract', arc.name],
+            ['Window', `${formatShort(arc.startDate)} → ${formatShort(arcEnd(arc))}`],
+            ['Progress', `${streaks?.elapsed ?? 0} of ${arc.totalDays} days`],
+          ].map(([k, v]) => (
+            <Row key={k}>
+              <span className="text-muted flex-1 text-[14.5px]">{k}</span>
+              <span className="tnum text-[14.5px]">{v}</span>
+            </Row>
+          ))}
+          <Row onClick={() => nav('/contract')}>
+            <span className="flex-1 text-[14.5px] font-medium">Edit contract</span>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-faint" aria-hidden>
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </Row>
+        </List>
       </section>
 
-      <section className="card mt-2.5 px-4 py-4">
-        <div className="text-faint mb-1 text-[10px] font-semibold tracking-[0.09em] uppercase">Backup</div>
-        <p className="text-muted mb-3.5 text-[12.5px] leading-relaxed">
-          Journals and photos live only on this phone — they are never uploaded. An export is the only way to get
-          them back if you lose the device.
+      <section className="mt-9">
+        <Label>Backup</Label>
+        <p className="text-muted mb-4 px-1 text-[13.5px] leading-relaxed">
+          Journals and photos live only on this phone — they are never uploaded. An export is the only way to get them
+          back if you lose the device.
         </p>
         <div className="space-y-2">
-          <Button variant="ghost" onClick={doExport}>
+          <Button variant="secondary" onClick={doExport}>
             Export everything
           </Button>
-          <Button variant="ghost" onClick={() => fileRef.current?.click()}>
+          <Button variant="secondary" onClick={() => fileRef.current?.click()}>
             Import from a file
           </Button>
           <input
@@ -124,31 +115,31 @@ export default function Settings({ data }: { data: ArcData }) {
             onChange={(e) => e.target.files?.[0] && void doImport(e.target.files[0])}
           />
         </div>
-        {note && <p className="text-ice-300 mt-3 text-[12.5px]">{note}</p>}
+        {note && <p className="text-ice-300 mt-3 px-1 text-[13px]">{note}</p>}
       </section>
 
-      <section className="card mt-2.5 px-4 py-4">
-        <div className="flex items-center justify-between">
-          <div className="min-w-0 pr-3">
-            <div className="text-[14px] font-medium">Protected storage</div>
-            <div className="text-faint text-[12px] leading-snug">
-              {persisted
-                ? 'Safari will not evict your data.'
-                : 'Not granted yet — installing to the home screen helps.'}
+      <section className="mt-9">
+        <Label>Storage</Label>
+        <List>
+          <Row>
+            <div className="min-w-0 flex-1">
+              <div className="text-[14.5px] font-medium">Protected storage</div>
+              <div className="text-faint text-[12.5px] leading-snug">
+                {persisted ? 'Safari will not evict your data.' : 'Not granted yet — installing to the home screen helps.'}
+              </div>
             </div>
-          </div>
-          {!persisted && (
-            <button
-              onClick={() => requestPersistence().then(setPersisted)}
-              className="press border-line shrink-0 rounded-lg border px-3 py-2 text-[12.5px]"
-            >
-              Request
-            </button>
-          )}
-        </div>
+            {persisted ? (
+              <span className="bg-ice-300 h-2 w-2 shrink-0 rounded-full shadow-[0_0_8px_rgb(163_224_255/0.8)]" />
+            ) : (
+              <Button size="sm" variant="secondary" onClick={() => void requestPersistence().then(setPersisted)}>
+                Request
+              </Button>
+            )}
+          </Row>
+        </List>
       </section>
 
-      <section className="mt-6">
+      <section className="mt-9">
         <Button
           variant="danger"
           onClick={() => {
@@ -161,7 +152,7 @@ export default function Settings({ data }: { data: ArcData }) {
         </Button>
       </section>
 
-      <p className="text-faint mt-8 text-center text-[11.5px] leading-relaxed">
+      <p className="text-faint mt-8 text-center text-[12px] leading-relaxed">
         Cold Arc · everything local by default
         <br />
         No account needed until you join a squad.

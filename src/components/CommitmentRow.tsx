@@ -3,6 +3,7 @@ import { setLogValue, toggleCommitment } from '../lib/actions'
 import { clockToMinutes, minutesToClock } from '../lib/presets'
 import type { CommitmentResult } from '../lib/scoring'
 import type { Arc } from '../lib/types'
+import { IconChip } from './ui'
 
 /** Step size that feels right whether the target is 3.8 litres or 10,000 steps. */
 function stepFor(target: number): number {
@@ -17,12 +18,16 @@ const trim = (n: number) => Number(n.toFixed(2)).toString()
 function Check({ on, dim }: { on: boolean; dim?: boolean }) {
   return (
     <div
-      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition-all duration-200 ${
-        on ? 'border-ice-400 bg-ice-400' : dim ? 'border-line' : 'border-faint'
+      className={`grid h-7 w-7 shrink-0 place-items-center rounded-full transition-all duration-300 ${
+        on
+          ? 'bg-fg shadow-[0_0_18px_rgb(163_224_255/0.45)]'
+          : dim
+            ? 'border border-white/10'
+            : 'border-[1.5px] border-white/25'
       }`}
     >
       {on && (
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-ink)" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20 6 9 17l-5-5" />
         </svg>
       )}
@@ -30,6 +35,7 @@ function Check({ on, dim }: { on: boolean; dim?: boolean }) {
   )
 }
 
+/** One commitment as a row inside the day's list. Rows carry no box of their own. */
 export function CommitmentRow({ arc, result, date }: { arc: Arc; result: CommitmentResult; date: string }) {
   const { commitment: c, satisfied, value, scheduled, fraction } = result
   const [editing, setEditing] = useState(false)
@@ -47,7 +53,7 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
   const optional = !scheduled
 
   const hint = (() => {
-    if (c.kind === 'bool') return optional ? 'Optional today' : c.cadence === 'n_per_week' ? `${c.timesPerWeek}×/week` : ''
+    if (c.kind === 'bool') return optional ? 'Optional today' : c.cadence === 'n_per_week' ? `${c.timesPerWeek}× a week` : ''
     if (c.kind === 'time') return `${c.direction === 'at_most' ? 'by' : 'after'} ${minutesToClock(c.target)}`
     const dir = c.direction === 'at_most' ? 'under ' : ''
     return `${dir}${trim(c.target)} ${c.unit}`
@@ -57,14 +63,12 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
     return (
       <button
         onClick={() => void toggleCommitment(arc, c, date, !satisfied)}
-        className={`press card flex w-full items-center gap-3.5 px-4 py-3.5 text-left ${
-          satisfied ? 'border-ice-400/25 bg-ice-400/[0.06]' : ''
-        }`}
+        className="press-row flex w-full items-center gap-3.5 px-4 py-3.5 text-left"
       >
-        <span className={`text-[20px] ${optional && !satisfied ? 'opacity-45' : ''}`}>{c.icon}</span>
+        <IconChip icon={c.icon} dim={optional && !satisfied} />
         <div className="min-w-0 flex-1">
-          <div className={`truncate text-[15px] font-medium ${optional && !satisfied ? 'text-muted' : ''}`}>{c.label}</div>
-          {hint && <div className="text-faint text-[12px]">{hint}</div>}
+          <div className={`truncate text-[15.5px] font-medium ${optional && !satisfied ? 'text-muted' : ''}`}>{c.label}</div>
+          {hint && <div className="text-faint text-[12.5px]">{hint}</div>}
         </div>
         <Check on={satisfied} dim={optional} />
       </button>
@@ -73,18 +77,19 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
 
   if (c.kind === 'time') {
     return (
-      <div className={`card flex items-center gap-3.5 px-4 py-3.5 ${satisfied ? 'border-ice-400/25 bg-ice-400/[0.06]' : ''}`}>
-        <span className="text-[20px]">{c.icon}</span>
+      <div className="flex items-center gap-3.5 px-4 py-3.5">
+        <IconChip icon={c.icon} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-medium">{c.label}</div>
-          <div className="text-faint text-[12px]">{hint}</div>
+          <div className="truncate text-[15.5px] font-medium">{c.label}</div>
+          <div className="text-faint text-[12.5px]">{hint}</div>
         </div>
         <input
           type="time"
           value={value === null ? '' : minutesToClock(value)}
           onChange={(e) => commit(e.target.value ? clockToMinutes(e.target.value) : null)}
-          className={`tnum bg-surface-2 border-line rounded-lg border px-2.5 py-1.5 text-[15px] outline-none ${
-            satisfied ? 'text-ice-300' : 'text-fg'
+          aria-label={`${c.label} time`}
+          className={`tnum rounded-full px-3.5 py-1.5 text-[15px] outline-none ${
+            satisfied ? 'bg-fg text-ink' : 'text-fg bg-white/[0.07]'
           }`}
         />
       </div>
@@ -97,17 +102,18 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
   const pct = Math.round(fraction * 100)
 
   return (
-    <div className={`card relative overflow-hidden px-4 py-3.5 ${satisfied ? 'border-ice-400/25' : ''}`}>
-      {/* Fill bar reads progress at a glance without adding another element to scan. */}
-      <div
-        className="bg-ice-400/[0.09] absolute inset-y-0 left-0 transition-[width] duration-300"
-        style={{ width: `${pct}%` }}
-        aria-hidden
-      />
-      <div className="relative flex items-center gap-3.5">
-        <span className="text-[20px]">{c.icon}</span>
+    <div className="relative px-4 py-3.5">
+      {/* A hairline of progress along the bottom edge, instead of filling the whole row. */}
+      <div className="absolute inset-x-4 bottom-0 h-px overflow-hidden" aria-hidden>
+        <div
+          className="bg-ice-300 h-full shadow-[0_0_8px_rgb(163_224_255/0.8)] transition-[width] duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-center gap-3.5">
+        <IconChip icon={c.icon} />
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[15px] font-medium">{c.label}</div>
+          <div className="truncate text-[15.5px] font-medium">{c.label}</div>
           {editing ? (
             <input
               ref={inputRef}
@@ -121,7 +127,7 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
                 commit(Number.isFinite(n) && n >= 0 ? n : null)
               }}
               onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.blur()}
-              className="text-ice-300 tnum w-24 bg-transparent text-[12px] outline-none"
+              className="text-ice-300 tnum w-24 bg-transparent text-[12.5px] outline-none"
             />
           ) : (
             <button
@@ -129,7 +135,7 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
                 setDraft(value === null ? '' : trim(value))
                 setEditing(true)
               }}
-              className="tnum text-faint text-[12px]"
+              className="tnum text-faint text-[12.5px]"
             >
               <span className={satisfied ? 'text-ice-300' : value !== null ? 'text-muted' : ''}>
                 {value === null ? '—' : trim(value)}
@@ -139,19 +145,19 @@ export function CommitmentRow({ arc, result, date }: { arc: Arc; result: Commitm
             </button>
           )}
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={() => commit(Math.max(0, current - step) || null)}
             disabled={value === null}
-            className="press bg-surface-2 border-line text-fg grid h-8 w-8 place-items-center rounded-full border text-[17px] leading-none disabled:opacity-30"
+            className="press text-fg grid h-9 w-9 place-items-center rounded-full bg-white/[0.07] text-[18px] leading-none disabled:opacity-30"
             aria-label={`Decrease ${c.label}`}
           >
             −
           </button>
           <button
             onClick={() => commit(current + step)}
-            className={`press grid h-8 w-8 place-items-center rounded-full border text-[17px] leading-none ${
-              satisfied ? 'border-ice-400 bg-ice-400 text-ink' : 'bg-surface-2 border-line text-fg'
+            className={`press grid h-9 w-9 place-items-center rounded-full text-[18px] leading-none ${
+              satisfied ? 'bg-fg text-ink' : 'text-fg bg-white/[0.07]'
             }`}
             aria-label={`Increase ${c.label}`}
           >

@@ -1,27 +1,30 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-ink: #08090b;
-  --color-surface: #101216;
-  --color-surface-2: #171a20;
-  --color-line: #23272f;
-  --color-line-soft: #191d24;
-  --color-fg: #e9edf3;
-  --color-muted: #828b99;
-  --color-faint: #565e6b;
+  /* Pure black with barely-there surfaces: structure comes from space and hairlines,
+     not from boxes. */
+  --color-ink: #000000;
+  --color-surface: #0b0b0d;
+  --color-surface-2: #141417;
+  --color-line: #29292e;
+  --color-line-soft: #18181b;
+  --color-fg: #f5f6fb;
+  --color-muted: #9d9da6;
+  --color-faint: #6a6a73;
 
-  --color-ice-50: #ecfaff;
-  --color-ice-200: #b8e7ff;
-  --color-ice-300: #7dd3fc;
-  --color-ice-400: #38bdf8;
-  --color-ice-500: #0ea5e9;
-  --color-ice-600: #0284c7;
+  /* The single accent. Swap these to re-tint the orb, the particles and the grid. */
+  --color-ice-50: #f2fbff;
+  --color-ice-200: #cdeeff;
+  --color-ice-300: #a3e0ff;
+  --color-ice-400: #6fcbff;
+  --color-ice-500: #3aaef2;
+  --color-ice-600: #1f78b8;
 
-  --color-ember: #fb923c;
-  --color-fail: #f2545b;
-  --color-gold: #fbbf24;
+  --color-ember: #ff9a52;
+  --color-fail: #ff6166;
+  --color-gold: #ffcb5c;
 
-  --font-sans: 'Inter var', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+  --font-sans: 'Geist Variable', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
 
   --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -38,6 +41,7 @@
     background: var(--color-ink);
     color: var(--color-fg);
     font-family: var(--font-sans);
+    letter-spacing: -0.011em;
     /* Kill the rubber-band scroll so the standalone app does not feel like a web page. */
     overscroll-behavior-y: none;
     -webkit-font-smoothing: antialiased;
@@ -72,37 +76,67 @@
     appearance: none;
     margin: 0;
   }
-}
 
-@utility safe-t {
-  padding-top: env(safe-area-inset-top);
-}
-@utility safe-b {
-  padding-bottom: env(safe-area-inset-bottom);
+  ::selection {
+    background: color-mix(in srgb, var(--color-ice-400) 35%, transparent);
+  }
 }
 
 @layer components {
+  /* Large type set tight, the way launch pages do it. */
+  .display {
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    line-height: 1.04;
+  }
+
   .card {
     background: var(--color-surface);
-    border: 1px solid var(--color-line-soft);
+    border: 1px solid rgb(255 255 255 / 0.05);
+    border-radius: 1.375rem;
+  }
+
+  .field {
+    width: 100%;
+    background: var(--color-surface-2);
+    border: 1px solid rgb(255 255 255 / 0.06);
     border-radius: 1rem;
+    padding: 0.85rem 1rem;
+    color: var(--color-fg);
+    outline: none;
+    transition: border-color 160ms var(--ease-out-quint);
+  }
+  .field:focus {
+    border-color: rgb(255 255 255 / 0.3);
+  }
+  .field::placeholder {
+    color: var(--color-faint);
   }
 
   .press {
     transition:
-      transform 140ms var(--ease-out-quint),
-      background-color 140ms var(--ease-out-quint),
-      border-color 140ms var(--ease-out-quint);
+      transform 160ms var(--ease-out-quint),
+      background-color 160ms var(--ease-out-quint),
+      border-color 160ms var(--ease-out-quint),
+      opacity 160ms var(--ease-out-quint);
   }
   .press:active {
-    transform: scale(0.975);
+    transform: scale(0.97);
+  }
+
+  /* Rows inside a grouped list light up instead of shrinking. */
+  .press-row {
+    transition: background-color 160ms var(--ease-out-quint);
+  }
+  .press-row:active {
+    background-color: rgb(255 255 255 / 0.04);
   }
 }
 
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -111,12 +145,59 @@
 }
 
 .rise {
-  animation: rise 320ms var(--ease-out-quint) both;
+  animation: rise 520ms var(--ease-out-quint) both;
+}
+
+@keyframes orb-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.035);
+  }
+}
+
+@keyframes orb-flare {
+  from {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.orb-breathe {
+  animation: orb-breathe 6s ease-in-out infinite;
+}
+
+.orb-flare {
+  animation: orb-flare 900ms var(--ease-out-quint) forwards;
+}
+
+.pulse-dot {
+  animation: pulse-dot 2.2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .rise,
-  .press {
+  .press,
+  .press-row,
+  .orb-breathe,
+  .orb-flare,
+  .pulse-dot {
     animation: none;
     transition: none;
   }

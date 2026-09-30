@@ -1,6 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
+// Bundled rather than fetched from a font CDN: the app has to work offline, and it makes
+// no network requests you did not ask for.
+import '@fontsource-variable/geist'
 import App from './App.tsx'
 import './index.css'
 

@@ -35,8 +35,12 @@ Your values, already filled in:
 3. Open `supabase/migrations/0001_init.sql` from this repo, select **all** of it, and paste
    it into the editor.
 4. Click **Run** (or Ctrl+Enter).
+5. Do the same with `supabase/migrations/0002_duel_rpc.sql`. It stops people from editing
+   a duel to name themselves the winner.
 
-You should see `Success. No rows returned`. That is correct — it creates tables, not rows.
+You should see `Success. No rows returned` each time. That is correct — it creates tables, not rows.
+
+**Already set up before?** Only run `0002_duel_rpc.sql`. Both files are safe to re-run.
 
 **If you see an error**, stop and send me the message. Do not run it twice hoping it
 works; the script is safe to re-run, but an error means something needs fixing first.
@@ -76,22 +80,35 @@ Names must match exactly, including the `VITE_` prefix.
 
 ---
 
-## Step 5 — Let the magic link come back
+## Step 5 — Turn on GitHub sign-in
 
-This is the step people skip, and then sign-in silently fails.
+Squads sign in with GitHub. No emails are involved, which matters: Supabase's free email
+cannot send a code, and an emailed link opens in Safari instead of the installed app.
+
+**5a. Create a GitHub OAuth app**
+
+1. Go to **[github.com/settings/developers](https://github.com/settings/developers)** →
+   **OAuth Apps** → **New OAuth App**.
+2. Fill in:
+   - **Application name:** `Cold Arc`
+   - **Homepage URL:** `https://suyash2906.github.io/COLD_ARC/`
+   - **Authorization callback URL:** your Project URL from Step 3 plus `/auth/v1/callback`,
+     e.g. `https://abcdefgh.supabase.co/auth/v1/callback`
+3. Click **Register application**, then **Generate a new client secret**. Keep the tab open.
+
+**5b. Give it to Supabase**
+
+1. Supabase sidebar → **Authentication** → **Sign In / Providers** → **GitHub**.
+2. Turn it on, paste the **Client ID** and **Client Secret**, and save.
+
+**5c. Let the sign-in come back to the app**
 
 1. Supabase sidebar → **Authentication** → **URL Configuration**.
-2. Set **Site URL** to:
-   ```
-   https://suyash2906.github.io/COLD_ARC/
-   ```
-3. Under **Redirect URLs**, click Add URL and enter:
-   ```
-   https://suyash2906.github.io/COLD_ARC/**
-   ```
+2. Set **Site URL** to `https://suyash2906.github.io/COLD_ARC/`
+3. Under **Redirect URLs**, add `https://suyash2906.github.io/COLD_ARC/**`
+
    The `**` matters — the app returns to `.../COLD_ARC/?code=...#/squad`, and without the
    wildcard Supabase rejects it.
-4. Save.
 
 ---
 
@@ -111,14 +128,12 @@ Wait for the green tick (about a minute).
 On your phone, open the app and **force-close it first** (swipe up from the app switcher)
 so the service worker picks up the new build.
 
-1. Open the **Squad** tab. It should now show a sign-in box instead of "No backend
-   connected yet".
-2. Enter your email → **Email me a link**.
-3. Check your inbox and tap the link **on your phone**. It should bounce you back into the
-   app, signed in.
-4. Pick a handle and an emoji.
-5. Tap **Start a squad**, name it, and you will get a 6-character invite code.
-6. Send that code to a friend. They install the app the same way, sign in, choose **Join
+1. Open the **Squad** tab. It should now show **Continue with GitHub** instead of "No
+   backend connected yet".
+2. Tap it, sign in to GitHub and approve. It should bounce you back into the app, signed in.
+3. Pick a handle (it starts as your GitHub username) and an emoji.
+4. Tap **Start a squad**, name it, and you will get a 6-character invite code.
+5. Send that code to a friend. They install the app the same way, sign in, choose **Join
    with a code**, and you will both appear on the leaderboard.
 
 ---
@@ -145,8 +160,9 @@ ever changes.
 names are exactly `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`, then re-run the
 workflow.
 
-**The magic link opens a browser but does not sign me in** — Step 5. Make sure the
-redirect URL ends in `**`.
+**GitHub sends me back but I am not signed in** — Step 5c. Make sure the redirect URL ends
+in `**`. If GitHub shows "redirect_uri is not associated", the callback URL in 5a does not
+match your Supabase Project URL exactly.
 
 **"No squad with that code"** — codes are 6 characters and case is ignored. Check for a
 mistyped `0` vs `O` (the generator avoids ambiguous characters, so if you see a zero it is

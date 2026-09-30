@@ -29,8 +29,8 @@ export default defineConfig(({ command, isPreview }) => ({
         scope: '.',
         display: 'standalone',
         orientation: 'portrait',
-        theme_color: '#08090B',
-        background_color: '#08090B',
+        theme_color: '#000000',
+        background_color: '#000000',
         categories: ['health', 'lifestyle', 'productivity'],
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },

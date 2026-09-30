@@ -73,8 +73,8 @@ export interface Duel {
 }
 
 /**
- * Magic links must return to the exact deployed path. The `?code=` lands before the
- * fragment, so the route survives and the user comes back to the Squad tab.
+ * The GitHub sign-in must return to the exact deployed path. The `?code=` lands before
+ * the fragment, so the route survives and the user comes back to the Squad tab.
  */
 export function authRedirectUrl(): string {
   return `${window.location.origin}${window.location.pathname}#/squad`
