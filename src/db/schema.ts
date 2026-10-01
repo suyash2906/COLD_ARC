@@ -47,6 +47,33 @@ class ColdArcDB extends Dexie {
             if (c.remindAt === undefined && typeof at === 'number') c.remindAt = at
           })
       })
+    // Cut & Study's Workout became a did-you-go tick after some contracts were signed (and
+    // locked). Convert those: any minutes already logged on a day count as having gone.
+    this.version(4)
+      .stores({})
+      .upgrade(async (tx) => {
+        const arcIds = new Set(
+          (await tx.table<Arc>('arcs').toArray()).filter((a) => a.presetId === 'cut-and-study').map((a) => a.id),
+        )
+        const converted = new Set<string>()
+        await tx
+          .table<Commitment>('commitments')
+          .toCollection()
+          .modify((c) => {
+            if (!arcIds.has(c.arcId) || c.label !== 'Workout' || c.kind !== 'duration') return
+            converted.add(c.id)
+            Object.assign(c, { kind: 'bool', target: 1, unit: '', direction: 'at_least' })
+          })
+        if (converted.size === 0) return
+        // A fresh query each time: Dexie's filter() narrows the collection it is called on.
+        const logs = () => tx.table<LogEntry>('logs').where('commitmentId').anyOf([...converted])
+        await logs()
+          .filter((l) => l.value <= 0)
+          .delete()
+        await logs().modify((l) => {
+          l.value = 1
+        })
+      })
   }
 }
 

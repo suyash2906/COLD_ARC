@@ -131,8 +131,8 @@ export async function setDayMeta(
   })
 }
 
-/** A workout at least this long ticks a yes/no training habit. */
-const WORKOUT_COUNTS_MINUTES = 20
+/** Any real session ticks a yes/no training habit; the floor only skips a workout started by accident. */
+const WORKOUT_COUNTS_MINUTES = 10
 
 /**
  * Writes pasted Health numbers into the arc: steps into the steps habit, workout minutes

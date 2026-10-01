@@ -59,7 +59,8 @@ export const CONTRACT_PRESETS: ContractPreset[] = [
       t({ label: 'Water', icon: '💧', kind: 'count', target: 3, unit: 'L', remindAt: 1200 }),
       t({ label: 'Steps', icon: '👟', kind: 'count', target: 8000, unit: 'steps', remindAt: 1260 }),
       t({ label: "Revise today's lectures", icon: '📝', kind: 'duration', target: 15, unit: 'min', remindAt: 1140 }),
-      t({ label: 'Workout', icon: '💪', kind: 'duration', target: 20, unit: 'min', weight: 2, important: true, remindAt: 1200 }),
+      // Did you train or not. How long is Hevy's business.
+      t({ label: 'Workout', icon: '💪', weight: 2, important: true, remindAt: 1200 }),
       t({ label: 'Deep study, phone away', icon: '📚', kind: 'duration', target: 60, unit: 'min', weight: 2, important: true, remindAt: 1260 }),
       t({ label: 'No junk or sugary drinks', icon: '🥗', weight: 2, important: true }),
       t({ label: 'Kitchen closed after 9 pm', icon: '🍽️', remindAt: 1260 }),
